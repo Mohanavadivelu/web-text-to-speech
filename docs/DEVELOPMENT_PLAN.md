@@ -79,9 +79,9 @@ Builds `server/engine/` as described in §5 of the Stage 1 plan.
 | M1.4 | `engine/synth.py`: `KokoroEngine` with ONNX Runtime session (threads from an env var), segmenting with `first_segment_chars`, phoneme packing up to 510, speed, pitch, `on_chunk` / `on_progress` callbacks, cancel through `RunOptions.terminate`, measured real-time factor | 1.0 | With `first_segment_chars=150` the first chunk is ≤150 chars of text; joining all segments gives back the input; cancel stops within 1 s |
 | M1.5 | `engine/text.py`: `clean_text`, `count_words`, `estimate_seconds`, `apply_pronunciations` (plain and phoneme forms), `extract_text` for `.txt/.md/.docx/.pdf` | 0.25 | Unit tests for each function, including password-protected and image-only PDFs |
 | M1.6 | `engine/audio.py`: float32 → PCM16 bytes; MP3 (64 kbps mono) and WAV with `soundfile` | 0.1 | Lengths and sample rate correct; the MP3 plays in a browser |
-| M1.7 | Reference-audio tests: record one clip per language once, then compare every run with spectral correlation ≥ 0.997. Runs in CI in `python:3.12-slim` with `espeak-ng` installed | 0.4 | Test passes in CI; a deliberately changed speed fails it |
+| M1.7 | Reference-audio tests: record one clip per language once, then compare every run with spectral correlation ≥ 0.997. Clips are made on Linux (`python:3.12-slim`); CI runs the tests in a separate `engine` job with the model files cached | 0.4 | Test passes in CI; a deliberately changed speed fails it |
 
-**Risk to watch:** espeak-ng and misaki setup on Linux (system libraries, the spaCy model). M1.3 and M1.7 surface this on day one, before anything is built on top.
+**Result (M1 done):** the engine runs on Linux and Windows with no system packages. Measured on an i7-12700H: about 3.5–4× real time; the first audio of a long text arrives after ~2.1 s with the short first segment (12.1 s without); cancel takes ~0.3 s. Loading and warming up a worker takes ~8.5 s.
 
 ---
 
@@ -89,7 +89,7 @@ Builds `server/engine/` as described in §5 of the Stage 1 plan.
 
 | ID | Task | Est. | Done when |
 |---|---|---|---|
-| M2.1 | `server/Dockerfile` (multi-stage): system packages (`espeak-ng`, `libsndfile1`), Python deps, spaCy model, then the `model_store` CLI downloads the model into `/app/models`. A non-root user. Two entry commands (`api`, `worker`) | 0.75 | Image under ~1.8 GB; the container starts with networking off and generates speech |
+| M2.1 | `server/Dockerfile` (multi-stage): Python deps (no system packages needed, see M1), then the `model_store` CLI downloads the model into `/app/models`. A non-root user. Two entry commands (`api`, `worker`) | 0.75 | Image under ~1.8 GB; the container starts with networking off and generates speech |
 | M2.2 | `server/docker-compose.yml` for local development: `redis`, `api`, `worker` (Caddy comes in M6). Source mounted for hot reload | 0.25 | `docker compose up` starts all services |
 | M2.3 | `worker/storage.py`: upload to R2 (boto3, S3-compatible endpoint), create 1-hour signed URLs, store keys under `audio/users/…` and `audio/anon/…` | 0.25 | Integration test against a test bucket |
 | M2.4 | `worker/jobs.py` + `worker/main.py`: arq worker loads `KokoroEngine` once at startup. Each job calls `generate(..., on_chunk, on_progress, cancel_event, first_segment_chars=150)`, publishes events to `job:{id}` in Redis (message formats in §7), keeps chunks in a replay list (10-minute expiry), uploads the MP3 at the end and sends `done` | 1.0 | A script queues a job and receives `started`, chunks, `progress` and `done` with a working URL |

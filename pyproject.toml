@@ -22,7 +22,7 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"server/tests/**" = ["S101"]   # assert is fine in tests
+"server/tests/**" = ["S101", "S105", "S106"]   # asserts and dummy passwords are fine in tests
 "scripts/**" = ["T20"]         # scripts may print
 
 [tool.pytest.ini_options]
@@ -30,4 +30,8 @@ testpaths = ["server/tests"]
 addopts = "-ra --strict-markers"
 markers = [
   "slow: needs the speech model (deselect with -m 'not slow')",
+]
+filterwarnings = [
+  # misaki (third-party) still uses importlib.resources.open_text
+  "ignore:open_text is deprecated:DeprecationWarning:misaki",
 ]

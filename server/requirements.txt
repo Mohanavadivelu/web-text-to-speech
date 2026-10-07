@@ -1,7 +1,22 @@
-# Runtime dependencies for the API and workers.
-# Engine dependencies (onnxruntime, misaki, spaCy, ...) are added in M1,
-# worker dependencies (arq, redis, boto3) in M2.
+# Runtime dependencies for the API, workers and speech engine.
+# Worker dependencies (arq, redis, boto3) arrive in M2.
+
+# ── API ──────────────────────────────────────────────────────────────────────
 fastapi==0.142.3
 uvicorn[standard]==0.54.0
 pydantic==2.13.5
 pydantic-settings==2.15.0
+
+# ── Speech engine (server/engine) ────────────────────────────────────────────
+numpy==2.4.6
+onnxruntime==1.30.0
+soundfile==0.14.0
+misaki==0.9.4                 # G2P; installed without extras so PyTorch isn't pulled in
+spacy==3.8.16
+en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl#sha256=1932429db727d4bff3deed6b34cfc05df17794f4a52eeb26cf8928f7c1a0fb85
+num2words==0.5.14
+espeakng-loader==0.2.4        # bundles espeak-ng (non-English phonemes); no system package needed
+phonemizer-fork==3.3.2
+loguru==0.7.3
+python-docx==1.2.0
+pypdf==6.19.0

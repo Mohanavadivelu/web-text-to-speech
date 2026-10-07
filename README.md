@@ -2,7 +2,7 @@
 
 Natural-sounding text-to-speech in the browser, powered by the open [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) model. Paste text or open a document, pick a voice, and hear it within seconds.
 
-> **Status:** early development. Milestone M0 (project setup) is in progress; see the [development plan](docs/DEVELOPMENT_PLAN.md).
+> **Status:** early development. M0 (project setup) and M1 (speech engine) are done; next is M2 (worker and Docker image). See the [development plan](docs/DEVELOPMENT_PLAN.md).
 
 ## Features (Stage 1)
 
@@ -90,6 +90,13 @@ pip install -r requirements-dev.txt
 uvicorn server.api.main:app --reload          # http://localhost:8000/v1/health
 ```
 
+**Speech engine** (downloads the 330 MB model once, then speaks a sentence):
+
+```bash
+python -m server.engine.model_store download
+python -m server.engine.synth "Hello there." --voice af_heart --out hello.wav
+```
+
 **Web app:**
 
 ```bash
@@ -101,7 +108,7 @@ npm run dev                                    # http://localhost:5173 (proxies 
 **Checks** (the same ones CI runs):
 
 ```bash
-ruff check . && ruff format --check . && pytest
+ruff check . && ruff format --check . && pytest       # model tests skip until the model is downloaded
 cd web && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build
 ```
 

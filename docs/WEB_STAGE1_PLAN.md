@@ -170,11 +170,11 @@ text ─► pronunciations ─► segments ─► G2P ─► phoneme packing ─
 
 ### Built into the Docker image
 
-The image installs `espeak-ng` (apt) and the spaCy English model misaki needs, and downloads the Kokoro ONNX model and voices with `model_store` during the build. It will be roughly 1.5 GB, and containers start in seconds with no network calls.
+No system packages are needed: `espeakng-loader` bundles espeak-ng, the spaCy English model is a pinned pip dependency, and `soundfile` bundles libsndfile (including MP3 encoding). The build downloads and verifies the Kokoro ONNX model and voices with `python -m server.engine.model_store download`. The image will be roughly 1.5 GB, and containers start in seconds with no network calls.
 
 ### Reference-audio tests
 
-A fixed set of sentences (at least one per language) is synthesised and compared with stored reference clips using spectral correlation, which must be at least 0.997. This catches silent changes in the voice when onnxruntime, misaki, spaCy or espeak-ng are upgraded.
+A fixed sentence per language is synthesised and compared with stored reference clips (`server/tests/reference/`, made on Linux) using the correlation of log-magnitude spectrograms, which must be at least 0.997, and a length check (within 2%). Windows and Linux output measured 0.999–1.000 with identical lengths. This catches silent changes in the voice when onnxruntime, misaki, spaCy or espeak-ng are upgraded.
 
 ---
 
@@ -571,7 +571,7 @@ For one developer, working full time:
 
 | Week | Phase | Deliverables |
 |---|---|---|
-| 1 | **Speech engine + worker** | `server/engine/` with the short first segment for streaming; reference-audio tests; Dockerfile with espeak-ng, the spaCy model and Kokoro built in; worker that runs a job from Redis and uploads MP3 to R2 |
+| 1 | **Speech engine + worker** | `server/engine/` with the short first segment for streaming; reference-audio tests; Dockerfile with the spaCy model and Kokoro built in; worker that runs a job from Redis and uploads MP3 to R2 |
 | 1–2 | **API** | FastAPI with `/voices`, `/tts/jobs`, WebSocket streaming, cancel, `/files/extract`, `/text/clean`; arq queue; Redis rate limits and quotas; OpenAPI docs; unit tests |
 | 2–3 | **Web frontend** | Studio screen: editor, voice settings, mixing, streaming player with waveform, download; file open and clean text; Studio Dark theme; mobile layout |
 | 3 | **Accounts** | Supabase Auth (email link + Google); history; saved pronunciations; Turnstile on anonymous use; database migrations with row-level security |
