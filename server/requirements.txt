@@ -1,0 +1,7 @@
+# Runtime dependencies for the API and workers.
+# Engine dependencies (onnxruntime, misaki, spaCy, ...) are added in M1,
+# worker dependencies (arq, redis, boto3) in M2.
+fastapi==0.142.3
+uvicorn[standard]==0.54.0
+pydantic==2.13.5
+pydantic-settings==2.15.0

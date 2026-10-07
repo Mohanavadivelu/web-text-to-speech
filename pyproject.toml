@@ -1,0 +1,33 @@
+[project]
+name = "kokoro-tts-web"
+version = "0.0.0"
+description = "Text-to-speech web service built on Kokoro-82M"
+requires-python = ">=3.11,<3.13"   # misaki and spaCy don't support 3.13 yet; production uses 3.12
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["web"]
+
+[tool.ruff.lint]
+select = [
+  "E", "W",   # pycodestyle
+  "F",        # pyflakes
+  "I",        # import sorting
+  "B",        # bugbear
+  "UP",       # pyupgrade
+  "SIM",      # simplify
+  "S",        # bandit (security)
+  "T20",      # no print()
+]
+
+[tool.ruff.lint.per-file-ignores]
+"server/tests/**" = ["S101"]   # assert is fine in tests
+"scripts/**" = ["T20"]         # scripts may print
+
+[tool.pytest.ini_options]
+testpaths = ["server/tests"]
+addopts = "-ra --strict-markers"
+markers = [
+  "slow: needs the speech model (deselect with -m 'not slow')",
+]

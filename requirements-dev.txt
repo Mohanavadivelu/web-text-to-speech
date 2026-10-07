@@ -1,0 +1,5 @@
+# Development and CI tools, on top of the runtime dependencies.
+-r server/requirements.txt
+pytest==9.1.1
+httpx2==2.13.1               # test client for FastAPI/Starlette
+ruff==0.16.10

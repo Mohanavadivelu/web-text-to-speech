@@ -1,0 +1,42 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# Speech model files (downloaded at build time, never committed)
+models/
+
+# Generated audio (reference clips in server/tests/reference/ are committed)
+*.wav
+*.mp3
+!server/tests/reference/*.wav
+
+# Node / frontend
+node_modules/
+web/dist/
+web/coverage/
+*.tsbuildinfo
+web/test-results/
+web/playwright-report/
+
+# Logs
+logs/
+*.log
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
