@@ -20,7 +20,8 @@ OUT = ROOT / "web" / "src" / "api" / "openapi.json"
 
 def main() -> int:
     schema = create_app().openapi()
-    OUT.write_text(json.dumps(schema, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    with open(OUT, "w", encoding="utf-8", newline="\n") as fh:  # LF on every OS, like CI
+        fh.write(json.dumps(schema, indent=2, sort_keys=True) + "\n")
     print(f"wrote {OUT.relative_to(ROOT)}")
     return 0
 
