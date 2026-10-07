@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEV_COOKIE_SECRET = "dev-only-change-me"  # noqa: S105 (refused in production, see below)
 
 
 class Settings(BaseSettings):
@@ -12,6 +15,20 @@ class Settings(BaseSettings):
 
     app_env: str = "development"
     log_level: str = "INFO"
+
+    # Web
+    public_web_origin: str = "http://localhost:5173"  # CORS; comma-separate several origins
+    anon_cookie_secret: str = DEV_COOKIE_SECRET
+    sentry_dsn: str = ""
+    trust_cloudflare_ip_header: bool = False  # only behind Cloudflare (M6); otherwise spoofable
+
+    # Limits (anonymous users; signed-in limits arrive with accounts in M5)
+    anon_max_chars: int = 2000
+    max_active_jobs: int = 2  # running + queued, per user
+    rate_limit_per_minute: int = 10  # job and file requests, per IP
+    max_queued_jobs: int = 30  # per queue; above this new jobs get "busy"
+    max_upload_bytes: int = 5 * 1024 * 1024
+    extract_timeout_seconds: int = 20
 
     # Redis: job queue, live job events, cancel flags, rate limits
     redis_url: str = "redis://localhost:6379/0"
@@ -29,10 +46,21 @@ class Settings(BaseSettings):
     engine_threads: int = 0
     first_segment_chars: int = 150
 
-    # Jobs
+    # Jobs: short texts get their own queue so they never wait behind long ones
+    queue_short: str = "tts:short"
+    queue_long: str = "tts:long"
+    short_job_chars: int = 1000
+    worker_queue: str = "tts:long"  # which queue this worker serves
     job_event_ttl_seconds: int = 600  # how long live events stay replayable
     job_record_ttl_seconds: int = 86_400
     min_job_timeout_seconds: int = 60
+    cache_ttl_seconds: int = 20 * 3600  # shorter than the shortest audio lifetime (1 day)
+
+    @model_validator(mode="after")
+    def _no_dev_secrets_in_production(self) -> Settings:
+        if self.app_env == "production" and self.anon_cookie_secret == DEV_COOKIE_SECRET:
+            raise ValueError("ANON_COOKIE_SECRET must be set to a long random value in production.")
+        return self
 
     @property
     def storage_endpoint(self) -> str:

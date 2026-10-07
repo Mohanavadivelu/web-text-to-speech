@@ -35,6 +35,7 @@ class JobRequest:
     owner_kind: str = "anon"  # "users" or "anon"
     owner_id: str = "local"
     wav: bool = False  # also store a WAV copy (signed-in users)
+    cache_key: str | None = None  # remember the result so identical requests reuse it
 
 
 class _Stopper:
@@ -97,7 +98,7 @@ def run_job(
             redis.hset(record, "progress", percent)
             publisher.event(type="progress", percent=percent)
 
-    def finish(status: str, *, message=None, key=None, url=None, duration=None) -> dict:
+    def finish(status: str, *, message=None, key=None, duration=None) -> dict:
         """Store the final status and publish the matching final event (type == status)."""
         fields = {"status": status}
         final = {"type": status}
@@ -105,8 +106,6 @@ def run_job(
             fields["error"] = final["message"] = message
         if key:
             fields["key"] = key
-        if url:
-            final["url"] = url
         if duration is not None:
             fields["audio_seconds"] = final["duration"] = duration
         redis.hset(record, mapping=fields)
@@ -151,7 +150,6 @@ def run_job(
         if request.wav:
             wav_key = audio_key(request.owner_kind, request.owner_id, job_id, "wav")
             storage.put(wav_key, audio.encode_wav(result), CONTENT_TYPES["wav"])
-        url = storage.signed_url(key)
     except Exception:
         log.exception("Job %s: saving the audio failed", job_id)
         return finish(
@@ -161,4 +159,10 @@ def run_job(
         "Job %s done: %d chars, %.1fs audio in %.1fs",
         job_id, len(request.text), duration, time.perf_counter() - started,
     )  # fmt: skip
-    return finish("done", key=key, url=url, duration=duration)
+    if request.cache_key:
+        redis.set(
+            events.cache_entry_key(request.cache_key),
+            f"{key}|{duration}",
+            ex=settings.cache_ttl_seconds,
+        )
+    return finish("done", key=key, duration=duration)

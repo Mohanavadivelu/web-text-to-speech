@@ -43,6 +43,7 @@ class KokoroEngine:
         if threads is None:
             threads = int(os.environ.get("ENGINE_THREADS", "0") or 0)
         self.threads = threads  # ONNX Runtime intra-op threads; 0 = runtime default
+        self.spin = os.environ.get("ENGINE_SPIN", "1") == "1"
         self.realtime_factor: float | None = None  # measured audio-seconds per second
         self._session = None
         self._lock = threading.Lock()
@@ -72,6 +73,10 @@ class KokoroEngine:
             opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
             opts.intra_op_num_threads = self.threads
             opts.inter_op_num_threads = 1
+            if not self.spin:
+                # Idle threads sleep instead of busy-waiting: slightly slower alone, but
+                # several workers on one machine stop burning CPU fighting each other
+                opts.add_session_config_entry("session.intra_op.allow_spinning", "0")
             path = model_store.model_path()
             log.info("Loading %s (%s threads)", path, self.threads or "auto")
             self._session = ort.InferenceSession(

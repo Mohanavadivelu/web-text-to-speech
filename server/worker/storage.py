@@ -83,6 +83,12 @@ class Storage:
         except ClientError:
             return False
 
+    def copy(self, source_key: str, dest_key: str) -> None:
+        """Server-side copy (no download); used to reuse a cached result for a new owner."""
+        self._client.copy_object(
+            Bucket=self.bucket, Key=dest_key, CopySource={"Bucket": self.bucket, "Key": source_key}
+        )
+
     def delete(self, key: str) -> None:
         self._client.delete_object(Bucket=self.bucket, Key=key)
 

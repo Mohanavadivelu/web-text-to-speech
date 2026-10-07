@@ -46,3 +46,9 @@ def test_storage_endpoints_default_to_r2_and_can_be_overridden():
     )
     assert dev.storage_endpoint == "http://seaweedfs:8333"
     assert dev.storage_public_endpoint == "http://localhost:8333"
+
+
+def test_production_refuses_the_development_cookie_secret():
+    with pytest.raises(ValueError, match="ANON_COOKIE_SECRET"):
+        Settings(_env_file=None, app_env="production")
+    Settings(_env_file=None, app_env="production", anon_cookie_secret="x" * 40)

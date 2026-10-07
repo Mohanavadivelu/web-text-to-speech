@@ -29,6 +29,10 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest -m "not slow"
+      - name: OpenAPI schema is up to date
+        run: |
+          python scripts/export_openapi.py
+          git diff --exit-code web/src/api/openapi.json
 
   engine:
     name: Speech engine (model tests)
@@ -70,6 +74,10 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run format:check
+      - name: API types are up to date
+        run: |
+          npm run api:types
+          git diff --exit-code src/api/schema.d.ts
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
@@ -84,18 +92,19 @@ jobs:
           python-version: '3.12'
       - name: Build the image (dependencies and model built in)
         run: docker compose -f server/docker-compose.yml build
-      - name: Start Redis, storage, API and worker
+      - name: Start Redis, storage, API and both workers
         run: |
           docker compose -f server/docker-compose.yml up -d
-          for i in $(seq 1 60); do
-            docker compose -f server/docker-compose.yml logs worker | grep -q " ready" && break
+          for i in $(seq 1 90); do
+            [ "$(docker compose -f server/docker-compose.yml logs | grep -c ' ready on queue')" -ge 2 ] && break
             sleep 2
           done
           curl -fsS http://localhost:8000/v1/health
-      - name: Run a job and download its MP3
+      - name: Run jobs through the API and download the MP3
         run: |
-          pip install arq==0.28.0 redis==5.3.1 boto3==1.43.109 numpy==2.4.6 soundfile==0.14.0 pydantic-settings==2.15.0
+          pip install websockets==17.2 numpy==2.4.6 soundfile==0.14.0
           python scripts/try_job.py "Continuous integration says hello."
+          python scripts/try_job.py "Continuous integration says hello."   # served from cache
           python scripts/try_job.py --long --cancel-after 3
       - name: Logs
         if: failure()

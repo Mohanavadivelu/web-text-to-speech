@@ -20,3 +20,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - Speech worker (M2): arq jobs that stream audio pieces and progress through Redis (replayable for late listeners), store the MP3 (and optional WAV) in R2-compatible storage, and return a 1-hour signed link; cancel, per-job timeouts, a heartbeat for health checks, and user-safe error messages.
 - Production Dockerfile with the model built in (1.65 GB), and a Docker Compose stack with Redis, SeaweedFS as local S3 storage, the API and the worker.
 - `scripts/try_job.py` (run a job end to end) and `scripts/benchmark.py`; CI starts the whole stack and runs a real job on every push.
+- API (M3): create, check and cancel speech jobs; a WebSocket that streams status and audio (in frames of up to 1 s) and replays everything to late listeners; voices; text cleanup; document upload parsed in an isolated, time- and memory-limited process; result cache with server-side copies; one error format; request IDs; Sentry (no user text sent).
+- Separate short and long job queues, with the long worker at lower CPU priority and ONNX thread spinning off: a short request's first audio stays around 3.5 s while long jobs run (was ~140 s).
+- Anonymous visitors get an HMAC-signed cookie; jobs are visible only to their owner. Limits: text length, active jobs per visitor, requests per minute per IP and queue length.
+- OpenAPI schema exported to `web/src/api/openapi.json` with generated TypeScript types; CI fails if either is out of date.
+
+### Security
+- The API refuses to start in production with the development cookie secret, and only trusts `CF-Connecting-IP` when configured to (it's spoofable without Cloudflare in front).

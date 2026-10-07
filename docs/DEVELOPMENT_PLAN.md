@@ -110,13 +110,19 @@ Builds `server/engine/` as described in §5 of the Stage 1 plan.
 | M3.4 | `POST /v1/tts/jobs`, `GET /v1/tts/jobs/{id}` and `DELETE /v1/tts/jobs/{id}`. Jobs are kept in Redis for now; they move to Postgres in M5.3 | 0.75 | Create, poll and cancel work end to end |
 | M3.5 | `WS /v1/tts/jobs/{id}/stream`: replay buffered chunks, then follow the Redis channel live; close on `done`, `error` or `cancelled`; handle client disconnects | 0.75 | A test client gets the full audio even when it connects 2 s late |
 | M3.6 | Result cache: cache key from §8; on a hit, return `done` straight away with the existing R2 object | 0.25 | The second identical request finishes in under 200 ms without reaching a worker |
-| M3.7 | `POST /v1/files/extract`: check the type from file content, size limit, parse in the worker with a 20 s timeout using `engine.text.extract_text`, delete the temp file | 0.5 | Tests for good, damaged, password-protected and scanned PDFs, a good DOCX and an oversized file |
+| M3.7 | `POST /v1/files/extract`: check the type from file content, size limit, parse in a separate short-lived process with a 20 s timeout and memory limit using `engine.text.extract_text` (not the speech workers, which may be busy for minutes) | 0.5 | Tests for good, damaged, password-protected and scanned PDFs, a good DOCX and an oversized file |
 | M3.8 | `POST /v1/text/clean` | 0.1 | Output matches `engine.text.clean_text` |
 | M3.9 | Basic rate limit (per IP, in Redis); the full limits come in M5 | 0.25 | 11th request in a minute gets `rate_limited` |
 | M3.10 | OpenAPI export: CI writes `openapi.json`; the frontend generates its typed client from it | 0.25 | `web/src/api/` is generated, not hand-written |
 | M3.11 | Two queues, `short` and `long` (Stage 1 plan §8); the worker's queue comes from an env var; compose runs one worker per queue | 0.25 | In the benchmark, a short job's first audio stays under 3 s while long jobs are running |
 
 **Ready for the frontend when:** M3.2, M3.4 and M3.5 are merged. M4 can start once those three are done.
+
+**Result (M3 done):** every endpoint works through Docker with real workers; 87 fast tests cover limits, owner checks, forged cookies, streaming (live and late), cache and uploads. Changes from the plan:
+- Events moved to a log-plus-signal protocol (`server/events.py`) so late or reconnecting listeners get every event exactly once.
+- The WebSocket sends audio in frames of up to 1 s; whole segments (up to ~30 s, 1.5 MB) broke a client's message size limit.
+- Short-queue first audio during heavy load: ~3.5 s (was ~140 s with one queue), with the long worker at lower priority and ONNX thread spinning off.
+- Visitors get an HMAC-signed `anon_id` cookie now (accounts still come in M5); the API refuses to start in production with the development cookie secret, and only trusts `CF-Connecting-IP` when configured.
 
 ---
 

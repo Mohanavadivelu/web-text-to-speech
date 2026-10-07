@@ -2,7 +2,7 @@
 
 Natural-sounding text-to-speech in the browser, powered by the open [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) model. Paste text or open a document, pick a voice, and hear it within seconds.
 
-> **Status:** early development. M0 (project setup), M1 (speech engine) and M2 (worker and Docker stack) are done; next is M3 (API). See the [development plan](docs/DEVELOPMENT_PLAN.md).
+> **Status:** early development. M0–M3 are done: project setup, speech engine, workers and the API. Next is M4 (web frontend). See the [development plan](docs/DEVELOPMENT_PLAN.md).
 
 ## Features (Stage 1)
 
@@ -101,9 +101,18 @@ python -m server.engine.synth "Hello there." --voice af_heart --out hello.wav
 
 ```bash
 docker compose -f server/docker-compose.yml up --build -d
-python scripts/try_job.py "Hello from the worker."     # queue a job, follow it live, download the MP3
+python scripts/try_job.py "Hello from the API."        # create a job, stream it live, download the MP3
 python scripts/benchmark.py --jobs 8                   # many jobs at once
 ```
+
+The API runs on http://localhost:8000; its interactive docs are at http://localhost:8000/docs. For example:
+
+```bash
+curl -c cookies.txt -H "Content-Type: application/json"      -d '{"text": "Hello there.", "voice": "af_heart"}' http://localhost:8000/v1/tts/jobs
+curl -b cookies.txt http://localhost:8000/v1/tts/jobs/<id>      # status and, when done, an MP3 link
+```
+
+Live audio comes over the WebSocket at `stream_url` (JSON status messages plus binary PCM16 audio). After changing the API, run `python scripts/export_openapi.py` and `npm run api:types` in `web/` to update the frontend's types.
 
 **Web app:**
 

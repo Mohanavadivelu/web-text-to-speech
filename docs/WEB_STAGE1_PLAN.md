@@ -271,28 +271,36 @@ Validation:
 - text length within the per-request limit for the user's tier ([§10](#10-accounts-limits-and-abuse-protection))
 - `turnstile_token` is required for anonymous users
 
-Response `201`:
+Response `201` (the `anon_id` cookie is set on the first request):
 
 ```json
 {
-  "id": "j_01JB…",
+  "id": "j_3f9c0a1b2d4e5f60",
   "status": "queued",
-  "position": 0,
-  "estimated_seconds": 4.2,
-  "stream_url": "/v1/tts/jobs/j_01JB…/stream"
+  "progress": 0,
+  "queue_position": 0,
+  "estimated_seconds": 4.7,
+  "audio_seconds": null,
+  "url": null,
+  "error": null,
+  "stream_url": "/v1/tts/jobs/j_3f9c0a1b2d4e5f60/stream"
 }
 ```
+
+If identical text and settings were spoken in the last ~20 hours, the job comes back already `done` with a `url` (see Cache in [§8](#8-job-flow-and-streaming)).
 
 ### WebSocket messages (server → browser)
 
 ```jsonc
-{ "type": "started", "segments": 6, "sample_rate": 24000 }
-// followed by binary frames: PCM16 mono, 24 kHz, one per segment
+{ "type": "started", "sample_rate": 24000, "estimated_seconds": 4.7 }
+// then binary messages: PCM16 little-endian mono at sample_rate, up to 1 s each
 { "type": "progress", "percent": 50 }
-{ "type": "done", "url": "https://audio.example.com/…signed…", "duration": 41.3 }
+{ "type": "done", "duration": 41.3, "url": "https://…signed, valid 1 hour…" }
 { "type": "error", "message": "The engine produced no audio for this text." }
 { "type": "cancelled" }
 ```
+
+Connecting late, or again, replays everything from the start. A second `started` means the job was retried after a worker failure: discard any audio received so far. Strangers (wrong or missing cookie) are refused with close code 4404.
 
 Error responses use one shape: `{"error": {"code": "quota_exceeded", "message": "…"}}`. The codes are `invalid_input`, `quota_exceeded`, `rate_limited`, `too_long`, `busy` (queue full), `not_found` and `internal`.
 
@@ -301,30 +309,29 @@ Error responses use one shape: `{"error": {"code": "quota_exceeded", "message": 
 ## 8. Job flow and streaming
 
 ```
-browser                api                    redis                 worker
-   │ POST /tts/jobs     │                        │                      │
-   │───────────────────►│ check limits, insert   │                      │
-   │                    │ job row (Postgres)     │                      │
-   │                    │ enqueue ──────────────►│                      │
-   │◄── 201 {id} ───────│                        │◄──── pick up job ────│
-   │ WS /stream ───────►│ subscribe job:{id} ───►│                      │
-   │                    │                        │◄─ publish chunk ─────│ engine.generate(
-   │◄── binary PCM ─────│◄───────────────────────│                      │   on_chunk=…, on_progress=…)
-   │◄── progress ───────│◄───────────────────────│◄─ publish progress ──│
-   │                    │                        │                      │ encode MP3 → upload R2
-   │◄── done {url} ─────│◄───────────────────────│◄─ publish done ──────│ update job row
+browser                api                     redis                       worker
+   │ POST /tts/jobs     │                         │                            │
+   │───────────────────►│ limits, cache lookup,   │                            │
+   │                    │ job record, enqueue ───►│ tts:short or tts:long      │
+   │◄── 201 {id} ───────│                         │◄──── pick up job ──────────│
+   │ WS /stream ───────►│ subscribe job:{id}:notify, read job:{id}:log         │
+   │                    │                         │◄─ append chunk + signal ───│ engine.generate(
+   │◄── binary PCM ─────│◄── read new entries ────│                            │   on_chunk, on_progress)
+   │◄── progress ───────│◄────────────────────────│◄─ append progress + signal │
+   │                    │                         │                            │ encode MP3 → upload R2
+   │◄── done {url} ─────│ sign a fresh URL ◄──────│◄─ append done + signal ────│ update job record
 ```
 
 Details:
 
-- **Chunks:** the worker passes `on_chunk` and `on_progress` callbacks to the engine's `generate()`. The worker converts each float32 chunk to PCM16 (48 KB per second of audio) and publishes it to the Redis channel `job:{id}`. It also appends the chunk to a short-lived Redis list, so a browser that reconnects can replay what it missed.
+- **Events:** every event (status JSON or a PCM16 audio chunk) is appended to a list `job:{id}:log` in Redis, and a signal is published on `job:{id}:notify`. A listener reads the list from where it left off each time a signal arrives. So a browser that connects late or reconnects gets every event exactly once, in order, with no gaps or duplicates. The log expires after 10 minutes. Full details are in `server/events.py`.
 - **First audio quickly:** with the short first segment from [§5](#5-speech-engine), the first chunk is about one sentence. On a modern CPU that takes roughly 1–2 s.
-- **Cancel:** `DELETE /jobs/{id}` sets `cancel:{id}` in Redis. A small thread in the worker watches for it and sets the engine's `cancel_event`, which also stops the running model call ([§5](#5-speech-engine)).
+- **Cancel:** `DELETE /jobs/{id}` sets `job:{id}:cancel` in Redis. A small thread in the worker watches for it and sets the engine's `cancel_event`, which also stops the running model call ([§5](#5-speech-engine)).
 - **Timeouts:** a job is killed after `max(60 s, 3 × estimated time)`. arq retries a job once only if the worker crashed, not if the input was bad.
-- **Final file:** when generation finishes, the worker encodes MP3 (64 kbps mono) with `soundfile`, uploads it to R2 at `audio/users/{user_id}/{job_id}.mp3` (or `audio/anon/{anon_id}/…`) and stores the key in Postgres. The browser receives a signed URL that is valid for 1 hour.
-- **Short jobs first:** jobs go to one of two queues by length: `short` (up to ~1,000 characters, about a minute of audio) and `long`. At least one worker serves only the `short` queue, so a one-sentence request never waits behind a book chapter. The M2 benchmark showed why: with one first-come-first-served queue, short requests waited about 140 s behind long ones.
-- **Queue fairness:** each user can have at most 1 running job and 2 queued. When the queue holds more than 30 jobs, the API returns `busy` to anonymous users first.
-- **Cache:** a key of `sha256(text + lang + voice + blend + speed + pitch + model version)` points to an existing R2 file. A repeated request returns immediately without using any compute.
+- **Final file:** when generation finishes, the worker encodes MP3 (64 kbps mono) with `soundfile`, uploads it to R2 at `audio/users/{user_id}/{job_id}.mp3` (or `audio/anon/{anon_id}/…`) and stores the key in the job record (Postgres from M5). The API signs a fresh 1-hour URL whenever the browser asks, so links in old events never go stale.
+- **Short jobs first:** jobs go to one of two queues by length: `short` (up to ~1,000 characters, about a minute of audio) and `long`. One worker serves only the `short` queue, so a one-sentence request never waits behind a book chapter. The long-queue worker runs at lower CPU priority (`nice`), and ONNX Runtime's thread spinning is off (`ENGINE_SPIN=0`) so the two workers don't burn CPU fighting each other. Measured in M3: with three long jobs running, a short request's first audio arrives in ~3.5 s; with one first-come-first-served queue it waited ~140 s.
+- **Queue fairness:** each visitor can have at most 2 jobs queued or running. When the queue holds more than 30 jobs, the API returns `busy` to anonymous users first.
+- **Cache:** a key of `sha256(text + all settings + model revision)` points to a finished MP3 for ~20 hours (less than the shortest audio lifetime). A repeated request is copied server-side into the new caller's own folder (so lifetimes and privacy stay per owner) and comes back `done` in a few milliseconds, without using the worker.
 
 ---
 
@@ -472,7 +479,7 @@ Keep secrets in a `.env` file on the VM (readable only by root) and in GitHub Ac
 
 ## 14. Security and privacy
 
-- **Input limits:** check text length before queueing. Uploads accept only `.txt/.md/.docx/.pdf`, with the type confirmed from the file's content and not just its extension. Uploads are capped at 5 MB, parsed in a worker under a 20-second time limit and a memory limit, and deleted right after extraction.
+- **Input limits:** check text length before queueing. Uploads accept only `.txt/.md/.docx/.pdf`, with the type confirmed from the file's content and not just its extension. Uploads are capped at 5 MB and parsed in a separate short-lived process (at most two at once) with a 20-second time limit and, on Linux, a 768 MB memory limit; the process is killed if it goes over, and the file is never written to disk.
 - **PDF and DOCX parsing:** pypdf and python-docx run inside the worker container, which has no secrets apart from R2 and Redis access. Keep both libraries up to date (Dependabot).
 - **No text retention:** don't store or log user text. Logs record lengths and settings only. This removes the main privacy risk and makes the privacy policy simple. The cache key is a hash, so the text can't be recovered from it.
 - **Signed URLs:** R2 objects are private; downloads use pre-signed URLs that expire after 1 hour.

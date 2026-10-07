@@ -2,55 +2,15 @@ import threading
 import time
 
 import fakeredis
-import numpy as np
 import pytest
 
 from server import events
 from server.config import Settings
-from server.engine.synth import GenerationCancelled
+from server.tests.fakes import FakeEngine, FakeStorage
 from server.worker.jobs import JobRequest, job_timeout, run_job
 from server.worker.storage import audio_key
 
 SETTINGS = Settings(_env_file=None, min_job_timeout_seconds=60)
-CHUNK = np.full(2400, 0.1, dtype=np.float32)  # 0.1 s of audio
-
-
-class FakeEngine:
-    def __init__(self, chunks=3, delay=0.0, error=None):
-        self.chunks, self.delay, self.error = chunks, delay, error
-        self.calls = []
-
-    def estimate_generation_seconds(self, audio_seconds):
-        return audio_seconds / 3
-
-    def generate(self, source_text, lang, voice, **kw):
-        self.calls.append(kw)
-        if self.error:
-            raise self.error
-        parts = []
-        for i in range(self.chunks):
-            deadline = time.monotonic() + self.delay
-            while time.monotonic() < deadline:
-                if kw["cancel_event"].is_set():
-                    raise GenerationCancelled()
-                time.sleep(0.01)
-            kw["on_chunk"](CHUNK)
-            kw["on_progress"](int((i + 1) / self.chunks * 100))
-            parts.append(CHUNK)
-        return np.concatenate(parts)
-
-
-class FakeStorage:
-    def __init__(self, fail=False):
-        self.objects, self.fail = {}, fail
-
-    def put(self, key, data, content_type):
-        if self.fail:
-            raise ConnectionError("storage down")
-        self.objects[key] = (data, content_type)
-
-    def signed_url(self, key):
-        return f"https://storage.test/{key}?signature=abc"
 
 
 @pytest.fixture
@@ -59,7 +19,7 @@ def redis():
 
 
 def _replay(redis, job_id):
-    return [events.decode(m) for m in redis.lrange(events.replay_key(job_id), 0, -1)]
+    return [events.decode(m) for m in redis.lrange(events.log_key(job_id), 0, -1)]
 
 
 def _run(redis, engine=None, storage=None, request=None, job_id="job1"):
@@ -78,7 +38,7 @@ def test_successful_job_streams_audio_and_stores_an_mp3(redis):
     final = _run(redis, storage=storage)
 
     key = audio_key("anon", "local", "job1")
-    assert final == {"type": "done", "url": storage.signed_url(key), "duration": 0.3}
+    assert final == {"type": "done", "duration": 0.3}
     assert storage.objects[key][1] == "audio/mpeg"
 
     replay = _replay(redis, "job1")
@@ -143,6 +103,16 @@ def test_storage_failure_still_ends_the_job(redis):
     final = _run(redis, storage=FakeStorage(fail=True))
     assert final["type"] == "error"
     assert _replay(redis, "job1")[-1] == ("event", final)
+
+
+def test_finished_job_is_remembered_for_identical_requests(redis):
+    request = JobRequest(text="Hi.", lang="a", voice="af_heart", cache_key="abc123")
+    _run(redis, request=request)
+    assert (
+        redis.get(events.cache_entry_key("abc123"))
+        == (audio_key("anon", "local", "job1") + "|0.3").encode()
+    )
+    assert 0 < redis.ttl(events.cache_entry_key("abc123")) <= SETTINGS.cache_ttl_seconds
 
 
 def test_retried_job_starts_a_fresh_replay(redis):

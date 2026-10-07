@@ -5,6 +5,8 @@ fastapi==0.142.3
 uvicorn[standard]==0.54.0
 pydantic==2.13.5
 pydantic-settings==2.15.0
+python-multipart==0.0.32      # file uploads
+sentry-sdk==2.71.0
 
 # ── Jobs and storage ─────────────────────────────────────────────────────────
 arq==0.28.0

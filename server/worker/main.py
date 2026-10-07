@@ -18,6 +18,7 @@ from dataclasses import asdict
 import redis as redis_sync
 from arq.connections import RedisSettings
 
+from server import events
 from server.config import get_settings
 from server.engine.synth import KokoroEngine
 from server.worker.jobs import JobRequest, run_job
@@ -25,7 +26,7 @@ from server.worker.storage import Storage
 
 log = logging.getLogger(__name__)
 
-HEARTBEAT_PREFIX = "workers:heartbeat:"
+HEARTBEAT_PREFIX = events.WORKER_HEARTBEAT_PREFIX
 HEARTBEAT_SECONDS = 10
 WORKER_ID = f"{socket.gethostname()}-{os.getpid()}"
 
@@ -50,6 +51,19 @@ async def _heartbeat(redis) -> None:
         await asyncio.sleep(HEARTBEAT_SECONDS)
 
 
+async def _ensure_bucket(storage, attempts: int = 10) -> None:
+    """The development store may still be starting; retry for a little while."""
+    for attempt in range(1, attempts + 1):
+        try:
+            await asyncio.to_thread(storage.ensure_bucket)
+            return
+        except Exception as exc:
+            if attempt == attempts:
+                raise
+            log.warning("Storage not ready (%s); retrying", type(exc).__name__)
+            await asyncio.sleep(2)
+
+
 async def startup(ctx: dict) -> None:
     settings = get_settings()
     logging.basicConfig(
@@ -59,12 +73,12 @@ async def startup(ctx: dict) -> None:
     ctx["redis_sync"] = redis_sync.Redis.from_url(settings.redis_url)
     ctx["storage"] = Storage(settings)
     if settings.r2_endpoint_url:  # development store: create the bucket if needed
-        await asyncio.to_thread(ctx["storage"].ensure_bucket)
+        await _ensure_bucket(ctx["storage"])
     engine = KokoroEngine(threads=settings.engine_threads)
     await asyncio.to_thread(engine.load)
     ctx["engine"] = engine
     ctx["heartbeat"] = asyncio.create_task(_heartbeat(ctx["redis"]))
-    log.info("Worker %s ready", WORKER_ID)
+    log.info("Worker %s ready on queue %s", WORKER_ID, settings.worker_queue)
 
 
 async def shutdown(ctx: dict) -> None:
@@ -84,6 +98,7 @@ class WorkerSettings:
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url)
+    queue_name = get_settings().worker_queue
     max_jobs = 1  # one job per process; the engine is CPU-bound
     max_tries = 2  # retried only if a worker dies mid-job
     job_timeout = 3600  # hard upper bound; run_job applies the real per-job timeout
