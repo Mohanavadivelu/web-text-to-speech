@@ -1,0 +1,6 @@
+# Only server/ is needed in the image.
+*
+!server/
+server/tests/
+**/__pycache__/
+**/*.py[cod]

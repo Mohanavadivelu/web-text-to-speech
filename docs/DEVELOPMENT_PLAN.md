@@ -58,9 +58,9 @@ This is the build plan for the Stage 1 MVP described in [WEB_STAGE1_PLAN.md](WEB
 | ID | Task | Est. | Done when |
 |---|---|---|---|
 | M0.1 | Create the folder layout from §6 (`server/engine/`, `server/api/`, `server/worker/`, `web/`, `scripts/`, `.github/`), plus `.gitignore`, `.editorconfig` and `.env.example` | 0.25 | Structure matches §6 |
-| M0.2 | Python tooling: Python 3.12, `server/requirements.txt` + `requirements-dev.txt` (pytest, ruff, httpx), `pyproject.toml` with ruff and pytest settings | 0.25 | `ruff check` and `pytest` run (with no tests yet) |
-| M0.3 | Frontend tooling: Vite + React + TypeScript in `web/`, ESLint, Prettier, Vitest | 0.25 | `npm run build` and `npm test` pass |
-| M0.4 | CI workflow: on each PR run ruff + pytest + eslint + vitest + a Docker build (no push) | 0.25 | A test PR shows all checks green |
+| M0.2 | Python tooling: Python 3.12, `server/requirements.txt` + `requirements-dev.txt` (pytest, ruff, httpx2), `pyproject.toml` with ruff and pytest settings | 0.25 | `ruff check` and `pytest` run (with no tests yet) |
+| M0.3 | Frontend tooling: Vite + React + TypeScript in `web/`, oxlint, Prettier, Vitest | 0.25 | `npm run build` and `npm test` pass |
+| M0.4 | CI workflow: on each PR run ruff + pytest + oxlint + Prettier + tsc + vitest + build, and a Docker build with a health check (no push); Dependabot for pip, npm, Docker and Actions | 0.25 | A test PR shows all checks green |
 | M0.5 | Create the accounts: Cloudflare (domain, Pages, R2, Turnstile), Supabase project, Sentry, Hetzner. Write the keys only into a password manager and `.env` locally | 0.5 | Every key in `.env.example` has a real value locally |
 
 **Needs before starting:** the domain and product name ([§14](#14-decisions-needed-and-when)).
@@ -193,7 +193,7 @@ M0 ─► M1 ─► M2 ─► M3.1–M3.5 ─┬─► M4 ───────�
 
 ## 12. Local development setup
 
-**Requirements:** Windows 11 with WSL2 (or macOS / Linux), Docker Desktop, Node 20+ and Python 3.12.
+**Requirements:** Windows 11 with WSL2 (or macOS / Linux), Docker Desktop, Node 22+ and Python 3.11 or 3.12 (production uses 3.12).
 
 **Daily loop:**
 
@@ -225,7 +225,7 @@ npx playwright test                                    # end to end (compose mus
 | Area | Rule |
 |---|---|
 | Python | Python 3.12, ruff for linting and formatting, type hints on public functions, `logging` (no `print`) |
-| TypeScript | Strict mode, ESLint + Prettier, function components and hooks, API types only from the generated client |
+| TypeScript | Strict mode, oxlint + Prettier, function components and hooks, API types only from the generated client |
 | API | Everything under `/v1`; error format from §7; breaking changes need `/v2` |
 | Config | All settings and limits from env vars, documented in `.env.example` |
 | Logs | Structured JSON with the request ID and job ID; **never log user text** |

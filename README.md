@@ -2,7 +2,7 @@
 
 Natural-sounding text-to-speech in the browser, powered by the open [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) model. Paste text or open a document, pick a voice, and hear it within seconds.
 
-> **Status:** planning. The design and plans are complete; application code starts with milestone M0 of the [development plan](docs/DEVELOPMENT_PLAN.md).
+> **Status:** early development. Milestone M0 (project setup) is in progress; see the [development plan](docs/DEVELOPMENT_PLAN.md).
 
 ## Features (Stage 1)
 
@@ -41,7 +41,7 @@ Every request becomes a job. A worker turns the text into speech segment by segm
 | Hosting | Hetzner VM with Docker Compose and Caddy |
 | Monitoring | Sentry, uptime checks, Grafana Cloud |
 
-## Project structure (planned)
+## Project structure
 
 ```
 server/
@@ -78,7 +78,33 @@ scripts/      benchmarks, voice previews, backups
 
 ## Getting started
 
-There's nothing to run yet. Local development instructions are in [§12 of the development plan](docs/DEVELOPMENT_PLAN.md#12-local-development-setup) and will move here once M0 is done.
+You need Python 3.11 or 3.12 and Node 22+. Docker comes in from milestone M2.
+
+**API** (from the repository root):
+
+```bash
+python -m venv .venv
+.venv/Scripts/activate            # Windows; on macOS/Linux: source .venv/bin/activate
+pip install -r requirements-dev.txt
+uvicorn server.api.main:app --reload          # http://localhost:8000/v1/health
+```
+
+**Web app:**
+
+```bash
+cd web
+npm install
+npm run dev                                    # http://localhost:5173 (proxies /v1 to :8000)
+```
+
+**Checks** (the same ones CI runs):
+
+```bash
+ruff check . && ruff format --check . && pytest
+cd web && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build
+```
+
+Copy `.env.example` to `.env` for local settings. The full local setup is in [§12 of the development plan](docs/DEVELOPMENT_PLAN.md#12-local-development-setup).
 
 ## Acknowledgements
 

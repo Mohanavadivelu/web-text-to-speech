@@ -435,7 +435,7 @@ Stage 1 doesn't need a separate staging server. Use a staging Cloudflare Pages p
 
 ### CI/CD (GitHub Actions)
 
-1. On every pull request: lint (ruff, eslint), unit tests, build the Docker image, and run the reference-audio tests from [§5](#5-speech-engine).
+1. On every pull request: lint (ruff, oxlint), unit tests, build the Docker image, and run the reference-audio tests from [§5](#5-speech-engine).
 2. On merge to `main`:
    - build and push the image to GitHub Container Registry (tagged with the commit SHA)
    - Cloudflare Pages builds `web/` automatically
