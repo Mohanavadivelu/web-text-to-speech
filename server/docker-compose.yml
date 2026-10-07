@@ -1,0 +1,70 @@
+# Local development stack: Redis, S3-compatible storage (SeaweedFS stands in for R2),
+# the API and the speech worker.
+#
+#   docker compose -f server/docker-compose.yml up --build
+#   docker compose -f server/docker-compose.yml up --scale worker=2    # more parallel jobs
+#
+# The containers read ../.env, but the storage and Redis settings below override it,
+# so local development never touches the real R2 bucket.
+
+x-app: &app
+  build:
+    context: ..
+    dockerfile: server/Dockerfile
+  image: kokoro-tts-web:dev
+  env_file:
+    - path: ../.env
+      required: false
+  environment: &app-env
+    REDIS_URL: redis://redis:6379/0
+    R2_ENDPOINT_URL: http://seaweedfs:8333
+    R2_PUBLIC_ENDPOINT_URL: http://localhost:8333
+    R2_ACCESS_KEY_ID: dev-access-key
+    R2_SECRET_ACCESS_KEY: dev-secret-key
+    R2_BUCKET: kokoro-tts-audio
+  volumes:
+    - ../server:/app/server:ro # code changes apply on restart, no rebuild needed
+  depends_on:
+    redis:
+      condition: service_healthy
+    seaweedfs:
+      condition: service_started
+
+services:
+  redis:
+    image: redis:7-alpine
+    command: ['redis-server', '--appendonly', 'yes']
+    ports: ['6379:6379']
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      retries: 10
+
+  seaweedfs:
+    image: chrislusf/seaweedfs
+    command: ['server', '-s3', '-s3.config=/etc/seaweedfs/s3.json', '-dir=/data']
+    ports: ['8333:8333']
+    volumes:
+      - ./dev/seaweedfs-s3.json:/etc/seaweedfs/s3.json:ro
+      - seaweedfs-data:/data
+
+  api:
+    <<: *app
+    command: ['uvicorn', 'server.api.main:app', '--host', '0.0.0.0', '--port', '8000', '--reload']
+    ports: ['8000:8000']
+
+  worker:
+    <<: *app
+    command: ['arq', 'server.worker.main.WorkerSettings']
+    environment:
+      <<: *app-env
+      ENGINE_THREADS: '${ENGINE_THREADS:-0}'
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+
+volumes:
+  redis-data:
+  seaweedfs-data:

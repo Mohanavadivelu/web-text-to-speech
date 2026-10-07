@@ -74,27 +74,29 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  docker:
-    name: Docker image builds
+  stack:
+    name: Docker stack (end-to-end job)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/build-push-action@v7
+      - uses: actions/setup-python@v7
         with:
-          context: .
-          file: server/Dockerfile
-          push: false
-          tags: kokoro-tts-web:ci
-          load: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Health check
+          python-version: '3.12'
+      - name: Build the image (dependencies and model built in)
+        run: docker compose -f server/docker-compose.yml build
+      - name: Start Redis, storage, API and worker
         run: |
-          docker run -d --name api -p 8000:8000 kokoro-tts-web:ci
-          for i in $(seq 1 20); do
-            curl -fsS http://localhost:8000/v1/health && exit 0
-            sleep 1
+          docker compose -f server/docker-compose.yml up -d
+          for i in $(seq 1 60); do
+            docker compose -f server/docker-compose.yml logs worker | grep -q " ready" && break
+            sleep 2
           done
-          docker logs api
-          exit 1
+          curl -fsS http://localhost:8000/v1/health
+      - name: Run a job and download its MP3
+        run: |
+          pip install arq==0.28.0 redis==5.3.1 boto3==1.43.109 numpy==2.4.6 soundfile==0.14.0 pydantic-settings==2.15.0
+          python scripts/try_job.py "Continuous integration says hello."
+          python scripts/try_job.py --long --cancel-after 3
+      - name: Logs
+        if: failure()
+        run: docker compose -f server/docker-compose.yml logs

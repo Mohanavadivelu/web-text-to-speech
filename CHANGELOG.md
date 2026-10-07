@@ -17,3 +17,6 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - Speech engine package `server/engine/` (M1): Kokoro-82M on ONNX Runtime with 7 languages and 37 voices, voice mixing, speed and pitch, streaming callbacks, a short first segment so streaming starts in ~2 s, and cancel in ~0.3 s. Includes text cleanup, pronunciations, duration estimates, `.txt/.md/.docx/.pdf` extraction with type and size checks, and MP3 (~64 kbps) / WAV encoding.
 - Model store with every file pinned to one Hugging Face revision and verified by SHA-256, with resumable downloads and a `download` / `verify` command line.
 - Engine tests: fast unit tests, model tests against reference clips for every language, and a CI job that caches the model files.
+- Speech worker (M2): arq jobs that stream audio pieces and progress through Redis (replayable for late listeners), store the MP3 (and optional WAV) in R2-compatible storage, and return a 1-hour signed link; cancel, per-job timeouts, a heartbeat for health checks, and user-safe error messages.
+- Production Dockerfile with the model built in (1.65 GB), and a Docker Compose stack with Redis, SeaweedFS as local S3 storage, the API and the worker.
+- `scripts/try_job.py` (run a job end to end) and `scripts/benchmark.py`; CI starts the whole stack and runs a real job on every push.

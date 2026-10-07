@@ -90,11 +90,13 @@ Builds `server/engine/` as described in §5 of the Stage 1 plan.
 | ID | Task | Est. | Done when |
 |---|---|---|---|
 | M2.1 | `server/Dockerfile` (multi-stage): Python deps (no system packages needed, see M1), then the `model_store` CLI downloads the model into `/app/models`. A non-root user. Two entry commands (`api`, `worker`) | 0.75 | Image under ~1.8 GB; the container starts with networking off and generates speech |
-| M2.2 | `server/docker-compose.yml` for local development: `redis`, `api`, `worker` (Caddy comes in M6). Source mounted for hot reload | 0.25 | `docker compose up` starts all services |
+| M2.2 | `server/docker-compose.yml` for local development: `redis`, SeaweedFS (S3-compatible, stands in for R2; MinIO's images are no longer published), `api`, `worker` (Caddy comes in M6). Source mounted | 0.25 | `docker compose up` starts all services |
 | M2.3 | `worker/storage.py`: upload to R2 (boto3, S3-compatible endpoint), create 1-hour signed URLs, store keys under `audio/users/…` and `audio/anon/…` | 0.25 | Integration test against a test bucket |
 | M2.4 | `worker/jobs.py` + `worker/main.py`: arq worker loads `KokoroEngine` once at startup. Each job calls `generate(..., on_chunk, on_progress, cancel_event, first_segment_chars=150)`, publishes events to `job:{id}` in Redis (message formats in §7), keeps chunks in a replay list (10-minute expiry), uploads the MP3 at the end and sends `done` | 1.0 | A script queues a job and receives `started`, chunks, `progress` and `done` with a working URL |
 | M2.5 | Cancel and timeout: a thread watches `cancel:{id}` and sets `cancel_event`; jobs are killed after `max(60 s, 3 × estimate)` | 0.25 | A long job stops within 2 s of cancel; the worker picks up the next job |
 | M2.6 | Local benchmark script: N parallel jobs with configurable workers × threads; prints throughput and time to first audio | 0.25 | Numbers recorded in the PR (production numbers come in M6.8) |
+
+**Result (M2 done):** the image is 1.65 GB and a worker is ready ~3 s after starting. End to end through Docker: first audio after 1.5–1.9 s, 3.5–3.9× real time, cancel confirmed 0.1 s after the request, and the bucket refuses unsigned or altered links (403). The benchmark found that short jobs wait behind long ones in a single queue, which is fixed by M3.11, and that throughput is capped by the CPU, not the number of workers (Stage 1 plan §16). CI now runs the whole stack and a real job on every push.
 
 ---
 
@@ -112,6 +114,7 @@ Builds `server/engine/` as described in §5 of the Stage 1 plan.
 | M3.8 | `POST /v1/text/clean` | 0.1 | Output matches `engine.text.clean_text` |
 | M3.9 | Basic rate limit (per IP, in Redis); the full limits come in M5 | 0.25 | 11th request in a minute gets `rate_limited` |
 | M3.10 | OpenAPI export: CI writes `openapi.json`; the frontend generates its typed client from it | 0.25 | `web/src/api/` is generated, not hand-written |
+| M3.11 | Two queues, `short` and `long` (Stage 1 plan §8); the worker's queue comes from an env var; compose runs one worker per queue | 0.25 | In the benchmark, a short job's first audio stays under 3 s while long jobs are running |
 
 **Ready for the frontend when:** M3.2, M3.4 and M3.5 are merged. M4 can start once those three are done.
 
@@ -199,7 +202,8 @@ M0 ─► M1 ─► M2 ─► M3.1–M3.5 ─┬─► M4 ───────�
 
 ```bash
 cp .env.example .env                                  # fill in local values (M0.5)
-docker compose -f server/docker-compose.yml up        # redis, api :8000, worker
+docker compose -f server/docker-compose.yml up --build   # redis, storage :8333, api :8000, worker
+python scripts/try_job.py "Hello."                     # queue a job and follow it live
 cd web && npm install && npm run dev                  # frontend :5173, proxies /v1 to :8000
 ```
 

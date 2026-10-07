@@ -2,7 +2,7 @@
 
 Natural-sounding text-to-speech in the browser, powered by the open [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) model. Paste text or open a document, pick a voice, and hear it within seconds.
 
-> **Status:** early development. M0 (project setup) and M1 (speech engine) are done; next is M2 (worker and Docker image). See the [development plan](docs/DEVELOPMENT_PLAN.md).
+> **Status:** early development. M0 (project setup), M1 (speech engine) and M2 (worker and Docker stack) are done; next is M3 (API). See the [development plan](docs/DEVELOPMENT_PLAN.md).
 
 ## Features (Stage 1)
 
@@ -79,7 +79,7 @@ scripts/      benchmarks, voice previews, backups
 
 ## Getting started
 
-You need Python 3.11 or 3.12 and Node 22+. Docker comes in from milestone M2.
+You need Python 3.11 or 3.12, Node 22+ and Docker Desktop.
 
 **API** (from the repository root):
 
@@ -95,6 +95,14 @@ uvicorn server.api.main:app --reload          # http://localhost:8000/v1/health
 ```bash
 python -m server.engine.model_store download
 python -m server.engine.synth "Hello there." --voice af_heart --out hello.wav
+```
+
+**Whole stack** (Redis, local S3 storage, API and a speech worker, in Docker):
+
+```bash
+docker compose -f server/docker-compose.yml up --build -d
+python scripts/try_job.py "Hello from the worker."     # queue a job, follow it live, download the MP3
+python scripts/benchmark.py --jobs 8                   # many jobs at once
 ```
 
 **Web app:**

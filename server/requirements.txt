@@ -1,11 +1,15 @@
 # Runtime dependencies for the API, workers and speech engine.
-# Worker dependencies (arq, redis, boto3) arrive in M2.
 
 # ── API ──────────────────────────────────────────────────────────────────────
 fastapi==0.142.3
 uvicorn[standard]==0.54.0
 pydantic==2.13.5
 pydantic-settings==2.15.0
+
+# ── Jobs and storage ─────────────────────────────────────────────────────────
+arq==0.28.0
+redis==5.3.1
+boto3==1.43.109
 
 # ── Speech engine (server/engine) ────────────────────────────────────────────
 numpy==2.4.6

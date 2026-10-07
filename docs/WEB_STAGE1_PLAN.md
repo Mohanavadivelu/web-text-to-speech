@@ -322,6 +322,7 @@ Details:
 - **Cancel:** `DELETE /jobs/{id}` sets `cancel:{id}` in Redis. A small thread in the worker watches for it and sets the engine's `cancel_event`, which also stops the running model call ([§5](#5-speech-engine)).
 - **Timeouts:** a job is killed after `max(60 s, 3 × estimated time)`. arq retries a job once only if the worker crashed, not if the input was bad.
 - **Final file:** when generation finishes, the worker encodes MP3 (64 kbps mono) with `soundfile`, uploads it to R2 at `audio/users/{user_id}/{job_id}.mp3` (or `audio/anon/{anon_id}/…`) and stores the key in Postgres. The browser receives a signed URL that is valid for 1 hour.
+- **Short jobs first:** jobs go to one of two queues by length: `short` (up to ~1,000 characters, about a minute of audio) and `long`. At least one worker serves only the `short` queue, so a one-sentence request never waits behind a book chapter. The M2 benchmark showed why: with one first-come-first-served queue, short requests waited about 140 s behind long ones.
 - **Queue fairness:** each user can have at most 1 running job and 2 queued. When the queue holds more than 30 jobs, the API returns `busy` to anonymous users first.
 - **Cache:** a key of `sha256(text + lang + voice + blend + speed + pitch + model version)` points to an existing R2 file. A repeated request returns immediately without using any compute.
 
@@ -501,16 +502,16 @@ Some voice IDs (`af_alloy`, `af_nova`, `am_echo`, …) share names with voices f
 
 Measured with ONNX Runtime on CPU: the engine runs at **about 3.8–4.8× real time** on a 20-thread Intel i7-12700H using all threads, and at about 75% of that speed with 4 threads.
 
-Assumptions for a 4-vCPU server worker (2 threads per worker, 2 workers):
-- each worker runs at about **1.5–2.5× real time**
-- the server as a whole produces about **3–5 audio-seconds per second**
+**Measured in M2** (Docker on the same laptop, 8 mixed jobs at once): the whole machine produced **about 3.5× real time whether it ran one worker or two**. Two workers each ran at 1.6–1.9×. **The CPU is the limit: adding workers on one machine doesn't add throughput.** It only lets jobs run side by side, which matters for keeping short jobs fast (see [§8](#8-job-flow-and-streaming)).
+
+Revised estimates (a vCPU is one hyper-thread, so 4 vCPU ≈ 2 physical cores):
 
 | Server | Workers × threads | Total audio throughput | Audio-hours per day at 30% load |
 |---|---|---|---|
-| CCX23 (4 vCPU) | 2 × 2 | ~3–5× real time | ~22–36 |
-| CCX33 (8 vCPU) | 4 × 2 | ~6–10× real time | ~43–72 |
+| CCX23 (4 vCPU) | 2 × 2 (one for the short queue) | ~1.5–2.5× real time | ~11–18 |
+| CCX33 (8 vCPU) | 2 × 4 or 3 × 3 | ~3–4× real time | ~22–29 |
 
-At 30% load, Stage 1's target of ~200 audio-hours per month (≈ 7 per day) uses well under a third of a CCX23. The headroom covers peaks, because usage clusters in a few hours of the day.
+Stage 1's target of ~200 audio-hours per month (≈ 7 per day) still fits a CCX23 at 30% load, but with less headroom than first planned. Move to a CCX33 early if the M6.8 benchmark lands at the low end.
 
 **Benchmark before launch:** run 20 mixed jobs (short and long texts, English and Hindi) on the chosen VM with 1, 2 and 4 threads per worker. Pick the setting with the best total throughput whose time to first audio stays under 3 s. Put the results in this section.
 
