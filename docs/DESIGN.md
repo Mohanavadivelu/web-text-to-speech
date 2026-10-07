@@ -1,480 +1,372 @@
-# Kokoro TTS — UI Design Specification
+# Kokoro TTS Web: UI Design Specification
 
-> **Note:** this is the original design spec from April 2026. The app has since gained voice mixing, a themed text editor toolbar, find/replace, pronunciations, a round play button, timestamped output and more. See the desktop app's [README](https://github.com/Mohanavadivelu/text-to-speech-app#readme) for the current features and project structure.
->
-> **For the web app:** this spec is the visual reference (Studio Dark colours, typography, layout and states) for the web frontend. The web version adapts it to the browser; where they differ, [WEB_STAGE1_PLAN.md](WEB_STAGE1_PLAN.md) wins.
-
-> **Theme:** Studio Dark (VS Code–inspired)  
-> **UI Framework:** CustomTkinter (`customtkinter`)  
-> **Layout:** Fullscreen / maximised to current OS window size on launch. Min size 820 × 580 px. All panels resize dynamically with the window.  
-> **Font stack:** Inter / Segoe UI (labels), JetBrains Mono / Consolas (text input, time display)
+> **Theme:** Studio Dark (default) with a matching light theme
+> **Stack:** React + TypeScript, plain CSS with design tokens (`web/src/styles/tokens.css`)
+> **Fonts:** Inter (interface), JetBrains Mono (editor, times, numbers), from Google Fonts with system fallbacks
+> **Icons:** [Lucide](https://lucide.dev) line icons, 1.5 px stroke; no emoji in the interface
+> **Supported widths:** 360 px and up; no horizontal page scrolling at any width
 
 ---
 
 ## Table of Contents
 
-1. [Colour Palette](#1-colour-palette)
+1. [Colour tokens](#1-colour-tokens)
 2. [Typography](#2-typography)
-3. [Window Layout Overview](#3-window-layout-overview)
-4. [Panel: Title Bar](#4-panel-title-bar)
-5. [Panel: Text Input (Left)](#5-panel-text-input-left)
-6. [Panel: Voice Settings (Right)](#6-panel-voice-settings-right)
-7. [Panel: Audio Player Bar](#7-panel-audio-player-bar)
-8. [Panel: Status Bar](#8-panel-status-bar)
-9. [Component: PlayerWaveformCanvas](#9-component-playerwaveformcanvas)
-10. [Component: Toast Notification](#10-component-toast-notification)
-11. [States & Transitions](#11-states--transitions)
-12. [Keyboard Shortcuts](#12-keyboard-shortcuts)
-13. [File Structure](#13-file-structure)
+3. [Spacing, radius and elevation](#3-spacing-radius-and-elevation)
+4. [Motion](#4-motion)
+5. [Layout and breakpoints](#5-layout-and-breakpoints)
+6. [Top bar](#6-top-bar)
+7. [Text editor panel](#7-text-editor-panel)
+8. [Player bar and waveform](#8-player-bar-and-waveform)
+9. [Voice settings panel](#9-voice-settings-panel)
+10. [Dialogs and overlays](#10-dialogs-and-overlays)
+11. [Toasts and messages](#11-toasts-and-messages)
+12. [History page](#12-history-page)
+13. [States and transitions](#13-states-and-transitions)
+14. [Keyboard shortcuts](#14-keyboard-shortcuts)
+15. [Accessibility](#15-accessibility)
 
 ---
 
-## 1. Colour Palette
+## 1. Colour tokens
 
-| Token | Hex | Usage |
-|---|---|---|
-| `bg` | `#0f0f13` | Main window background |
-| `surface` | `#1a1a24` | Card / panel surface |
-| `surface2` | `#22222f` | Input fields, inner surfaces |
-| `surface3` | `#2a2a3a` | Hover state, deeper surface |
-| `titlebar` | `#13131e` | Title bar + status bar background |
-| `border` | `#2e2e42` | Card borders, dividers |
-| `border2` | `#3a3a52` | Hover borders |
-| `accent` | `#7c5cbf` | Primary accent (purple) |
-| `accent_h` | `#9370db` | Accent hover / speed value |
-| `btn_play` | `#1db97a` | Play button background |
-| `btn_play_h` | `#22d68e` | Play button hover |
-| `btn_stop` | `#e05252` | Stop button text colour |
-| `btn_save` | `#3b8eea` | Save button text colour |
-| `text` | `#e8e8f0` | Primary text |
-| `text2` | `#9898b8` | Secondary text / labels |
-| `text3` | `#5a5a7a` | Dim text / placeholders |
-| `status_ok` | `#4ade80` | Status dot — ready |
-| `status_err` | `#f87171` | Status dot — error |
-| `status_busy` | `#f59e0b` | Status dot — generating |
-| `waveform_played` | `#60a5fa` | Played waveform bars (blue) |
-| `waveform_unplayed` | `#1e3a8a` | Unplayed waveform bars (dark blue) |
+All colours come from these CSS custom properties. Components never use raw hex values.
+
+| Token | Dark (default) | Light | Usage |
+|---|---|---|---|
+| `--bg` | `#0f0f13` | `#f7f7fb` | Page background |
+| `--surface` | `#1a1a24` | `#ffffff` | Panels and cards |
+| `--surface-2` | `#22222f` | `#f1f1f7` | Inputs, inner surfaces, player bar |
+| `--surface-3` | `#2a2a3a` | `#e7e7f0` | Hover, pressed, slider tracks |
+| `--chrome` | `#13131e` | `#fbfbfe` | Top bar background |
+| `--border` | `#2e2e42` | `#dcdce8` | Panel borders, dividers |
+| `--border-strong` | `#3a3a52` | `#c4c4d6` | Hover borders, focused inputs (with accent) |
+| `--accent` | `#7c5cbf` | `#6a48b0` | Primary buttons, slider fill, focus ring |
+| `--accent-hover` | `#9370db` | `#5a3b9c` | Hover on accent; large numeric values |
+| `--accent-soft` | `rgb(124 92 191 / 0.18)` | `rgb(106 72 176 / 0.10)` | Selected items, quality badges |
+| `--on-accent` | `#ffffff` | `#ffffff` | Text on accent backgrounds |
+| `--play` | `#1db97a` | `#14935f` | Play button |
+| `--play-hover` | `#22d68e` | `#107a4f` | Play button hover |
+| `--download` | `#3b8eea` | `#1f6fd1` | Download button and volume fill |
+| `--danger` | `#e05252` | `#c93a3a` | Cancel, destructive actions |
+| `--text` | `#e8e8f0` | `#1b1b26` | Primary text |
+| `--text-2` | `#9898b8` | `#55556e` | Labels, secondary text |
+| `--text-3` | `#6c6c8c` | `#7a7a92` | Hints, placeholders, metadata |
+| `--status-ok` | `#4ade80` | `#16a34a` | Ready |
+| `--status-busy` | `#f59e0b` | `#b45309` | Queued, generating |
+| `--status-error` | `#f87171` | `#dc2626` | Errors |
+| `--wave-played` | `#60a5fa` | `#2563eb` | Waveform bars before the playhead |
+| `--wave-unplayed` | `#1e3a8a` | `#bfd3f5` | Waveform bars after the playhead |
+| `--wave-pending` | `#2a2a3a` | `#e7e7f0` | Bars for audio not yet generated |
+
+**Rules:**
+- The theme follows the system setting (`prefers-color-scheme`) unless the user picks one in the top bar; the choice is kept in `localStorage`.
+- Text and interactive elements meet WCAG AA contrast (4.5:1 for body text, 3:1 for large text and UI parts) in both themes. `--text-3` is only for hints and metadata, never for essential information.
 
 ---
 
 ## 2. Typography
 
-| Token | Font | Size | Weight | Usage |
+| Token | Font | Size / line height | Weight | Usage |
 |---|---|---|---|---|
-| `FONT_TITLE` | Segoe UI | 15 | Bold | App title in title bar |
-| `FONT_LABEL` | Segoe UI | 10 | Bold | Button labels, section headers |
-| `FONT_SUBLABEL` | Segoe UI | 9 | Bold | Card headers |
-| `FONT_NORMAL` | Segoe UI | 10 | Normal | General text |
-| `FONT_SMALL` | Segoe UI | 9 | Normal | Status bar, metadata |
-| `FONT_TINY` | Segoe UI | 8 | Normal | Badges, char count |
-| `FONT_MONO` | Consolas | 10 | Normal | Text input area |
-| `FONT_SPEED` | JetBrains Mono | 20 | Bold | Speed / time display values |
+| `--font-ui` | Inter, "Segoe UI", system-ui, sans-serif | — | — | All interface text |
+| `--font-mono` | "JetBrains Mono", Consolas, monospace | — | — | Editor, times, numeric values |
+| `--type-title` | ui | 16 / 24 px | 600 | App name, page titles |
+| `--type-label` | ui | 13 / 20 px | 600 | Buttons, section headers |
+| `--type-overline` | ui | 11 / 16 px, +0.06em, uppercase | 600 | Small section labels ("LANGUAGE", "VOICE") |
+| `--type-body` | ui | 14 / 22 px | 400 | General text |
+| `--type-small` | ui | 12 / 18 px | 400 | Metadata, hints, counts |
+| `--type-editor` | mono | 15 / 26 px (zoom 80–160%) | 400 | Text editor |
+| `--type-value` | mono | 22 / 28 px | 700 | Speed and pitch values, current time |
+
+Numbers that change (times, counts) use `font-variant-numeric: tabular-nums` so they don't jitter.
 
 ---
 
-## 3. Window Layout Overview
+## 3. Spacing, radius and elevation
 
-The window launches **maximised** to the current OS screen size. All panels use `fill="both"` / `expand=True` so they grow and shrink with the window. The right settings panel has a fixed width of 300 px; the left text panel takes all remaining horizontal space.
-
-```
-┌─────────────────────────────────────────────────────────────────┐  ← fixed 52 px
-│  TITLE BAR                                              [badges] │
-├──────────────────────────────────┬──────────────────────────────┤  ← flex height
-│                                  │                              │
-│   TEXT INPUT PANEL (left)        │   VOICE SETTINGS (right)     │
-│   - CTkTextbox  (fills height)   │   - Language combo           │
-│   - Char count + Generate btn    │   - Voice combo + preview    │
-│                                  │   - Speed slider             │
-│                                  │   - Advanced (pitch)         │
-│                                  │   - Last output info         │
-│                                  │                              │
-├──────────────────────────────────┴──────────────────────────────┤  ← fixed ~110 px
-│  AUDIO PLAYER BAR                                               │
-│  [time] [waveform track ──────────────────] [controls] [vol]   │
-├─────────────────────────────────────────────────────────────────┤  ← fixed 28 px
-│  STATUS BAR  ● Ready  |  🎙 af_heart  |  [📂 History]          │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-## 4. Panel: Title Bar
-
-**File:** `ui/panels/titlebar.py`  
-**Class:** `TitleBar(ctk.CTkFrame)`  
-**Height:** 52 px  
-**Background:** `titlebar` (`#13131e`)
-
-### Layout
-
-```
-[ 🎙 icon ] [ Kokoro TTS / Text-to-Speech Studio ]    [ ⚡ model badge ] [ v1.0 badge ]
-```
-
-### UI Elements
-
-| Element | Widget | Properties | Functionality |
-|---|---|---|---|
-| App icon | `ctk.CTkFrame` | 32×32, bg=`accent`, corner_radius=8 | Static — shows 🎙 emoji centred |
-| App title | `ctk.CTkLabel` | font=`FONT_TITLE`, text_color=`text` | Static — "Kokoro TTS" |
-| App subtitle | `ctk.CTkLabel` | font=`FONT_TINY`, text_color=`text3` | Static — "Text-to-Speech Studio" |
-| Model badge | `ctk.CTkLabel` | bg=`surface2`, border=`accent`@40%, corner_radius=20, text_color=`accent_h` | Static — "⚡ hexgrad/Kokoro-82M" |
-| Version badge | `ctk.CTkLabel` | bg=`surface2`, border=`border`, corner_radius=20, text_color=`text3` | Static — "v1.0" |
-
----
-
-## 5. Panel: Text Input (Left)
-
-**File:** `ui/panels/text_panel.py`  
-**Class:** `TextPanel(ctk.CTkFrame)`  
-**Position:** Left column, fills available height  
-**Background:** `surface`, corner_radius=12, border=`border`
-
-### Layout
-
-```
-┌─────────────────────────────────────────┐
-│ 📝 TEXT INPUT                           │  ← card header
-├─────────────────────────────────────────┤
-│                                         │
-│  [CTkTextbox — monospace, dark]         │  ← text input area (flex height)
-│                                         │
-├─────────────────────────────────────────┤
-│ Characters: 0 · ~0s estimated  [✨ Btn] │  ← footer row
-└─────────────────────────────────────────┘
-```
-
-### UI Elements
-
-| Element | Widget | Properties | Functionality |
-|---|---|---|---|
-| Card header label | `ctk.CTkLabel` | text="📝 Text Input", font=`FONT_SUBLABEL`, text_color=`text2` | Static header |
-| Header divider | `ctk.CTkFrame` | height=1, bg=`border` | Visual separator |
-| Text input | `ctk.CTkTextbox` | font=`FONT_MONO`, fg_color=`surface2`, text_color=`text`, border_color=`border`, corner_radius=8, wrap="word" | Main text entry area. Fires `on_text_change` on `<KeyRelease>`. Focus border changes to `accent`. |
-| Char count label | `ctk.CTkLabel` | font=`FONT_TINY`, text_color=`text3` | Updates live: "Characters: N · ~Xs estimated" |
-| Generate button | `ctk.CTkButton` | text="✨ Generate Speech", fg_color=`accent`, hover_color=`accent_h`, corner_radius=50, font=`FONT_LABEL` | Triggers TTS generation. Disabled during generation. Shows animated fill state while generating. |
-| Shortcut badge | `ctk.CTkLabel` | text="Ctrl+Enter", bg=`surface3`, font=`FONT_TINY`, text_color=`text3`, corner_radius=4 | Visual hint only. `<Control-Return>` binding triggers generate. |
-
-### States
-
-| State | Generate Button | Text Input |
+| Token | Value | Usage |
 |---|---|---|
-| **Idle** | Enabled, purple gradient | Editable |
-| **Generating** | Disabled, animated fill overlay, text="⏳ Generating… N%" | Read-only |
-| **Done** | Re-enabled | Editable |
-| **Error** | Re-enabled | Editable |
+| `--space-1` … `--space-8` | 4, 8, 12, 16, 20, 24, 32, 48 px | All padding and gaps |
+| `--radius-sm` | 6 px | Badges, small buttons |
+| `--radius-md` | 10 px | Inputs, dropdowns, cards inside panels |
+| `--radius-lg` | 14 px | Panels, dialogs, bottom sheet |
+| `--radius-pill` | 999 px | Primary buttons, chips |
+| `--shadow-pop` | `0 8px 24px rgb(0 0 0 / 0.35)` dark, `0 8px 24px rgb(20 20 40 / 0.12)` light | Dropdowns, toasts, dialogs |
+| `--gutter` | 16 px (mobile), 24 px (≥ 768 px) | Page side padding |
+
+Panels use a 1 px `--border` instead of shadows; only floating elements get `--shadow-pop`.
 
 ---
 
-## 6. Panel: Voice Settings (Right)
+## 4. Motion
 
-**File:** `ui/panels/settings_panel.py`  
-**Class:** `SettingsPanel(ctk.CTkFrame)`  
-**Position:** Right column, fixed width 300 px  
-**Background:** `surface`, corner_radius=12, border=`border`
-
-### Layout
-
-```
-┌──────────────────────────────┐
-│ 🎛️ Voice Settings        [▶] │  ← header + collapse toggle
-├──────────────────────────────┤
-│ 🌐 LANGUAGE                  │
-│ [ 🇺🇸 American English  ▼ ]  │
-│                              │
-│ 🎤 VOICE                     │
-│ [ ♀ Heart  A ❤️  ▼ ] [▶]    │
-│                              │
-│ ⚡ SPEED                     │
-│        1.0                   │
-│    × normal speed            │
-│ 0.5× [━━━●━━━━━━━━] 2.0×    │
-│                              │
-│ ▶ Advanced Settings          │  ← collapsible accordion
-│   🎵 PITCH                   │
-│   -5 [━━━━━●━━━━━] +5        │
-│                              │
-│ ──────────────────────────── │
-│ 📁 LAST OUTPUT               │
-│ ┌──────────────────────────┐ │
-│ │ 🔊  output.wav           │ │
-│ │     24 kHz · WAV · 4.2s  │ │  ✅
-│ └──────────────────────────┘ │
-└──────────────────────────────┘
-```
-
-### UI Elements
-
-| Element | Widget | Properties | Functionality |
-|---|---|---|---|
-| Card header | `ctk.CTkLabel` | text="🎛️ Voice Settings", font=`FONT_SUBLABEL` | Static |
-| Collapse toggle | `ctk.CTkButton` | text="▶", width=24, bg=transparent | Collapses/expands the settings body |
-| Language label | `ctk.CTkLabel` | text="🌐 LANGUAGE", font=`FONT_TINY`, text_color=`text2` | Static section label |
-| Language combo | `ctk.CTkComboBox` | values=language list, fg_color=`surface2`, border_color=`border`, corner_radius=8 | Selecting a language updates the voice list and fires `on_language_change` |
-| Voice label | `ctk.CTkLabel` | text="🎤 VOICE", font=`FONT_TINY`, text_color=`text2` | Static section label |
-| Voice combo | `ctk.CTkComboBox` | values=voice labels, fg_color=`surface2`, border_color=`border`, corner_radius=8 | Selecting a voice updates `voice_var` and status bar |
-| Voice quality badge | `ctk.CTkLabel` | text=e.g. "A ❤️", bg=`accent`@25%, text_color=`accent_h`, corner_radius=4, font=`FONT_TINY` | Updates when voice changes |
-| Voice preview button | `ctk.CTkButton` | text="▶", width=28, fg_color=`surface3`, hover_color=`border2` | Plays a short sample of the selected voice (future feature — placeholder) |
-| Speed label | `ctk.CTkLabel` | text="⚡ SPEED", font=`FONT_TINY`, text_color=`text2` | Static |
-| Speed value | `ctk.CTkLabel` | text="1.0", font=`FONT_SPEED`, text_color=`accent_h` | Updates live as slider moves |
-| Speed unit | `ctk.CTkLabel` | text="× normal speed", font=`FONT_TINY`, text_color=`text3` | Static |
-| Speed slider | `ctk.CTkSlider` | from_=0.5, to=2.0, fg_color=`surface3`, progress_color=`accent`, button_color=white | Updates `speed_var` and speed value label |
-| Advanced toggle | `ctk.CTkButton` | text="▶ Advanced Settings", font=`FONT_SMALL`, bg=transparent, text_color=`text3` | Expands/collapses pitch section |
-| Pitch label | `ctk.CTkLabel` | text="🎵 PITCH", font=`FONT_TINY`, text_color=`text2` | Static (inside accordion) |
-| Pitch slider | `ctk.CTkSlider` | from_=-5, to=5, fg_color=`surface3`, progress_color=`accent` | Updates `pitch_var` |
-| Divider | `ctk.CTkFrame` | height=1, fg_color=`border` | Visual separator |
-| Last output label | `ctk.CTkLabel` | text="📁 LAST OUTPUT", font=`FONT_TINY`, text_color=`text2` | Static |
-| Output info card | `ctk.CTkFrame` | fg_color=`surface2`, border_color=`border`, corner_radius=8 | Container for output details |
-| Output icon | `ctk.CTkLabel` | text="🔊", font=16 | Static icon |
-| Output filename | `ctk.CTkLabel` | text="—", font=`FONT_SMALL`, text_color=`text` | Updated after generation: shows filename |
-| Output metadata | `ctk.CTkLabel` | text="", font=`FONT_TINY`, text_color=`text3` | Updated after generation: "24 kHz · WAV · Xs" |
-| Output check | `ctk.CTkLabel` | text="", text_color=`status_ok` | Shows "✅" after successful generation |
-
----
-
-## 7. Panel: Audio Player Bar
-
-**File:** `ui/panels/player_bar.py`  
-**Class:** `PlayerBar(ctk.CTkFrame)`  
-**Position:** Below body, above status bar  
-**Background:** `surface2`, border-top=`border`
-
-### Layout
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│ Player                                                          │  ← player-top
-├──────────────────────────────────────────────────────────────── │
-│  00:02   output.wav  [WAV] [24kHz]                              │  ← player-main
-│  00:04.2 [████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░] │
-├─────────────────────────────────────────────────────────────────┤
-│ [⏸] [⏹] [⏮] [⏭]  00:00:02 / 00:00:04.2  WAV  🔊[━━●━━] [💾] │  ← player-controls
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### UI Elements
-
-#### Player Top Row
-
-| Element | Widget | Properties | Functionality |
-|---|---|---|---|
-| "Player" label | `ctk.CTkLabel` | font=`FONT_SMALL`, text_color=`text2` | Static label |
-
-#### Player Main Row
-
-| Element | Widget | Properties | Functionality |
-|---|---|---|---|
-| Current time | `ctk.CTkLabel` | text="00:00", font=`FONT_SPEED`, text_color=white | Updates every 100 ms during playback |
-| Total time | `ctk.CTkLabel` | text="00:00.0", font=`FONT_SMALL`, text_color=`text3` | Set after generation |
-| Filename label | `ctk.CTkLabel` | font=`FONT_SMALL`, text_color=white, bold | Set after generation |
-| Format badge | `ctk.CTkLabel` | text="WAV", bg=`surface3`, font=`FONT_TINY`, text_color=`text3` | Static after generation |
-| Sample rate badge | `ctk.CTkLabel` | text="24kHz", bg=`surface3`, font=`FONT_TINY`, text_color=`text3` | Static after generation |
-| Waveform canvas | `PlayerWaveformCanvas` | height=32, bg=`#15151c` | Draws played (blue) / unplayed (dark) bars. Click to seek. |
-| Progress overlay | Drawn on canvas | Semi-transparent white fill + vertical line | Shows playback position |
-
-#### Player Controls Row
-
-| Element | Widget | Properties | Functionality |
-|---|---|---|---|
-| Play/Pause button | `ctk.CTkButton` | text="⏸"/"▶", width=28, bg=transparent, hover=`surface2` | Toggles playback. Shows ▶ when stopped, ⏸ when playing |
-| Stop button | `ctk.CTkButton` | text="⏹", width=28, bg=transparent | Stops playback, resets position to 0 |
-| Prev button | `ctk.CTkButton` | text="⏮", width=28, bg=transparent | Seeks to start (position=0) |
-| Next button | `ctk.CTkButton` | text="⏭", width=28, bg=transparent | Placeholder — no action |
-| Time info label | `ctk.CTkLabel` | font=`FONT_MONO` size 10, text_color=`text3` | "00:00:02 / 00:00:04.2" — updates during playback |
-| Volume icon | `ctk.CTkButton` | text="🔊", width=24, bg=transparent | Mute/unmute toggle |
-| Volume slider | `ctk.CTkSlider` | width=60, from_=0, to=1, fg_color=`surface3`, progress_color=`btn_save` | Controls playback volume (0.0–1.0) |
-| Save As button | `ctk.CTkButton` | text="💾 Save As…", fg_color=`surface2`, text_color=`btn_save`, border_color=`btn_save`@30%, corner_radius=50 | Opens file save dialog. Disabled until audio is generated. |
-
-### States
-
-| State | Waveform | Controls | Time |
-|---|---|---|---|
-| **No audio** | Empty — "Generate audio to see waveform" | All disabled (opacity 0.35) | "00:00 / 00:00" |
-| **Audio ready** | Full waveform drawn, all unplayed | Play/Stop/Prev/Save enabled | "00:00 / MM:SS.s" |
-| **Playing** | Progress overlay advances | Play shows ⏸, Stop enabled | Current time updates every 100 ms |
-| **Paused** | Progress overlay frozen | Play shows ▶ | Frozen at pause position |
-| **Generating** | Dimmed (opacity 0.5), pointer-events none | All disabled | Unchanged |
-
----
-
-## 8. Panel: Status Bar
-
-**File:** `ui/panels/statusbar.py`  
-**Class:** `StatusBar(ctk.CTkFrame)`  
-**Height:** 28 px  
-**Background:** `titlebar` (`#13131e`), border-top=`border`
-
-### Layout
-
-```
-● Ready  |  🎙 af_heart  |  [📂 History]  Kokoro TTS Studio
-```
-
-### UI Elements
-
-| Element | Widget | Properties | Functionality |
-|---|---|---|---|
-| Status dot | `ctk.CTkLabel` | text="●", font=`FONT_TINY` | Colour: `status_ok` (green) / `status_busy` (amber) / `status_err` (red). Pulses via `after()` loop when busy. |
-| Status message | `ctk.CTkLabel` | font=`FONT_SMALL`, text_color=`text2` | Updated by `_set_status(msg, state)` |
-| Separator | `ctk.CTkFrame` | width=1, height=14, fg_color=`border` | Visual divider |
-| Voice label | `ctk.CTkLabel` | text="🎙 af_heart", font=`FONT_TINY`, text_color=`text3` | Updated when voice selection changes |
-| Separator | `ctk.CTkFrame` | width=1, height=14, fg_color=`border` | Visual divider |
-| History button | `ctk.CTkButton` | text="📂 History", fg_color=transparent, border_color=`border2`, text_color=`text3`, corner_radius=4, font=`FONT_TINY` | Placeholder — no action yet |
-| App name label | `ctk.CTkLabel` | text="Kokoro TTS Studio", font=`FONT_TINY`, text_color=`text3` | Static, right-aligned |
-
-### Status States
-
-| State | Dot colour | Dot animation | Message colour |
-|---|---|---|---|
-| `ok` | `#4ade80` green | Slow pulse | `text2` |
-| `busy` | `#f59e0b` amber | Fast pulse | `#f59e0b` |
-| `error` | `#f87171` red | Static (no pulse) | `#f87171` |
-
----
-
-## 9. Component: PlayerWaveformCanvas
-
-**File:** `ui/components/player_waveform.py`  
-**Class:** `PlayerWaveformCanvas(tk.Canvas)`
-
-### Methods
-
-| Method | Parameters | Description |
+| Token | Value | Usage |
 |---|---|---|
-| `set_audio(audio, sample_rate)` | `np.ndarray`, `int` | Downsamples audio to canvas width, draws played/unplayed bars |
-| `set_progress(position_ratio)` | `float` 0.0–1.0 | Redraws progress overlay at given position |
-| `clear()` | — | Resets to empty state with placeholder text |
+| `--ease` | `cubic-bezier(0.2, 0, 0, 1)` | All transitions |
+| `--dur-fast` | 120 ms | Hover, press, focus |
+| `--dur-base` | 200 ms | Panels, toasts, accordion |
+| `--dur-slow` | 320 ms | Bottom sheet, dialogs |
 
-### Drawing Logic
-
-1. Downsample audio to N bars (N = canvas width ÷ 2)
-2. For each bar: height = `abs(sample) × canvas_height × 0.9`
-3. Bars left of `progress_ratio × N` → colour `waveform_played` (`#60a5fa`)
-4. Bars right of progress → colour `waveform_unplayed` (`#1e3a8a`)
-5. Progress line: 1 px vertical white line at `progress_ratio × width`
-6. Progress overlay: semi-transparent white fill from 0 to progress line
+- The status dot pulses while busy (1.2 s loop) and is static otherwise.
+- The Generate button shows a progress fill that moves with the job's percentage, never an endless animation.
+- With `prefers-reduced-motion: reduce`, transitions drop to 0 ms, the dot doesn't pulse and the waveform doesn't animate.
 
 ---
 
-## 10. Component: Toast Notification
+## 5. Layout and breakpoints
 
-**File:** `ui/components/toast.py`  
-**Class:** `Toast`
+### Wide (≥ 1024 px)
 
-### Behaviour
-
-- Appears as a floating frame anchored to the bottom-centre of the app window
-- Slides up with a smooth `after()` animation
-- Auto-dismisses after 4 seconds
-- Can be dismissed manually by clicking
-
-### UI Elements
-
-| Element | Widget | Properties |
-|---|---|---|
-| Container | `ctk.CTkFrame` | bg=`#1a1010` (error) or `surface3` (info), border=`status_err`@30%, corner_radius=8 |
-| Icon | `ctk.CTkLabel` | "🔴" (error) / "💡" (info) |
-| Message | `ctk.CTkLabel` | font=`FONT_SMALL`, text_color=`status_err` or `text` |
-
-### Usage
-
-```python
-Toast(root, message="Error: Model failed to load", kind="error")
-Toast(root, message="Saved to output.wav", kind="info")
 ```
+┌───────────────────────────────────────────────────────────────────────────┐
+│ TOP BAR   logo · Studio · History              usage ▓▓░  theme  account │  56 px
+├───────────────────────────────────────────────────┬───────────────────────┤
+│ TEXT EDITOR PANEL                                 │ VOICE SETTINGS        │
+│ toolbar: Open · Clean · Pronunciations · Undo/Redo│ Language              │
+│                                                   │ Voice  [▶ preview]    │
+│ editor (fills height)                             │ Mix voice + ratio     │
+│                                                   │ Speed                 │
+│                                                   │ Pitch (Advanced)      │
+│ footer: 1,204 chars · ~1m 26s · ▓▓▓░ 1.2k/20k     │                       │
+│                              [ Generate  ⌘↵ ]     │                       │  flex
+├───────────────────────────────────────────────────┴───────────────────────┤
+│ PLAYER BAR  [▶] 00:12 ▁▃▅▇▅▃▁▃▅▇▅▃▁▂▃▅▃▂▁░░░░░░░ 01:26   vol  [Download]│  88 px
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+- Content is capped at 1440 px wide and centred.
+- The settings column is 320 px; the editor takes the rest.
+- The page fills the viewport height (`100dvh`); only the editor scrolls.
+
+### Medium (768–1023 px)
+
+- The settings column becomes a 320 px drawer that slides in from the right, opened by a **Voice** button in the editor toolbar. The current voice name shows on that button.
+
+### Narrow (< 768 px)
+
+```
+┌──────────────────────────┐
+│ ☰  Kokoro TTS     ◐  👤 │  top bar, 52 px; nav in the menu
+├──────────────────────────┤
+│ [Heart · US · 1.0×  ▾]   │  voice summary chip → opens bottom sheet
+│ toolbar (icons only)     │
+│ editor                   │
+│                          │
+│ 1,204 chars · ~1m 26s    │
+│ [      Generate      ]   │  full-width button
+├──────────────────────────┤
+│ [▶] ▁▃▅▇▅▃▁░░░  00:12   │  sticky player, 64 px
+│              [Download]  │
+└──────────────────────────┘
+```
+
+- Voice settings open in a bottom sheet (up to 85% of the viewport height, drag handle, closes on swipe down or backdrop tap).
+- The player sticks to the bottom and respects `env(safe-area-inset-bottom)`.
+- Touch targets are at least 44 × 44 px.
 
 ---
 
-## 11. States & Transitions
+## 6. Top bar
 
-```
-IDLE
-  │
-  ├─[user types text]──────────────────► IDLE (char count updates)
-  │
-  ├─[click Generate / Ctrl+Enter]──────► GENERATING
-  │                                         │
-  │                                    [success]──► AUDIO_READY
-  │                                         │
-  │                                    [error]────► IDLE + Toast(error)
-  │
-AUDIO_READY
-  │
-  ├─[click Play / Space]───────────────► PLAYING
-  │                                         │
-  │                                    [playback ends]──► AUDIO_READY
-  │                                         │
-  │                                    [click Stop]─────► AUDIO_READY
-  │
-  ├─[click Generate again]─────────────► GENERATING
-  │
-  └─[click Save As]────────────────────► AUDIO_READY (file saved, toast shown)
-
-PLAYING
-  ├─[click Pause / Space]──────────────► PAUSED
-  └─[click Stop / Esc]─────────────────► AUDIO_READY
-
-PAUSED
-  └─[click Play / Space]───────────────► PLAYING
-```
-
----
-
-## 12. Keyboard Shortcuts
-
-| Shortcut | Action |
+| Element | Details |
 |---|---|
-| `Ctrl+Enter` | Generate speech |
-| `Space` | Play / Pause (when text input not focused) |
-| `Esc` | Stop playback |
-| `Ctrl+S` | Save As |
+| Logo + name | 28 px accent square with a waveform icon, then "Kokoro TTS" in `--type-title`. Links to Studio |
+| Navigation | Studio, History (History only when signed in). The current page has an accent underline |
+| Usage meter | Signed in and anonymous: a small bar with "12.4k / 100k today" in `--type-small`. Turns `--status-busy` above 80% and `--status-error` at 100% |
+| Theme toggle | Cycles System → Dark → Light; the icon shows the current choice |
+| Account | Signed out: **Sign in** text button. Signed in: avatar initials with a menu (History, Pronunciations, Sign out) |
+| Status dot | 8 px dot left of the usage meter: ready, busy or error, with a tooltip giving the status text |
+
+Background `--chrome`, 1 px bottom `--border`.
 
 ---
 
-## 13. File Structure
+## 7. Text editor panel
 
-```
-text-to-speech-app/
-│
-├── core/
-│   ├── __init__.py
-│   ├── engine.py                   ← TTSEngine: KPipeline wrapper, generate()
-│   ├── player.py                   ← AudioPlayer: play(), stop(), progress callbacks
-│   └── voices.py                   ← LANG_CODES, LANG_FLAGS, VOICES registry
-│
-├── ui/
-│   ├── __init__.py
-│   ├── app_window.py               ← KokoroApp: root window, wires panels to core
-│   ├── theme.py                    ← C{} palette, FONT_*, WIN_*, apply_styles()
-│   │
-│   ├── components/
-│   │   ├── __init__.py
-│   │   ├── styled_button.py        ← StyledButton (legacy compat, wraps CTkButton)
-│   │   ├── player_waveform.py      ← PlayerWaveformCanvas
-│   │   └── toast.py                ← Toast notification
-│   │
-│   └── panels/
-│       ├── __init__.py
-│       ├── titlebar.py             ← TitleBar panel
-│       ├── text_panel.py           ← TextPanel (text input + generate button)
-│       ├── settings_panel.py       ← SettingsPanel (voice, speed, pitch, output)
-│       ├── player_bar.py           ← PlayerBar (waveform + controls + volume)
-│       └── statusbar.py            ← StatusBar
-│
-├── DESIGN.md                       ← This file
-├── scripts/build.bat
-├── requirements.txt
-└── README.md
-```
+### Toolbar
 
-### Dependency Rules
+| Control | Icon | Behaviour |
+|---|---|---|
+| Open file | `file-up` | Opens a picker for `.txt .md .docx .pdf`. Signed-out users see the sign-in dialog instead |
+| Clean text | `sparkles` | Sends the text to `/v1/text/clean` and replaces it; one undo step reverts it |
+| Pronunciations | `book-a` | Opens the pronunciations dialog (signed in only) |
+| Undo / Redo | `undo-2` / `redo-2` | Editor history |
+| Zoom | `zoom-in` / `zoom-out` | 80–160% in 10% steps, remembered |
+| Voice (medium widths) | `audio-lines` + voice name | Opens the settings drawer |
 
-- `core/` — **zero** tkinter or UI imports
-- `ui/components/` — imports from `ui/theme.py` only
-- `ui/panels/` — imports from `ui/theme.py` and `ui/components/`
-- `ui/app_window.py` — imports from `core/` and `ui/panels/`
-- `app.py` — imports from `ui/app_window.py` only
+Icon buttons are 32 px square (44 px on touch), `--radius-sm`, with a tooltip and an `aria-label`.
+
+### Editor
+
+- A plain `<textarea>` with `--type-editor`, `--surface-2` background and `--radius-md`; focus shows a 2 px `--accent` ring.
+- Placeholder: "Type or paste text here, or drop a document."
+- **Drag and drop:** dragging a file over the panel shows a dashed `--accent` overlay reading "Drop to open".
+- **Selection:** when text is selected, the Generate button label changes to **Generate selection**.
+- **Draft:** text is saved to `localStorage` 500 ms after the last keystroke.
+
+### Footer
+
+| Element | Details |
+|---|---|
+| Counts | "1,204 characters · 212 words · ~1m 26s" in `--type-small`, `--text-3`. Duration uses the same formula as the engine and changes with speed and language |
+| Limit meter | Thin bar plus "1.2k / 20k". At 90% it turns `--status-busy`; over the limit it turns `--status-error`, the extra text is highlighted and Generate is disabled with the reason as a tooltip |
+| Generate button | Pill, `--accent`, `--type-label`, icon `play`. Shortcut hint chip "Ctrl ↵" (⌘↵ on macOS) |
 
 ---
 
-*Last updated: 2026-04-23*
+## 8. Player bar and waveform
+
+### Player bar
+
+| Element | Details |
+|---|---|
+| Play / pause | 44 px round `--play` button with `play` / `pause` icons |
+| Current time | `--type-value`, tabular numbers |
+| Waveform | Fills the free width; see below |
+| Total time | `--type-small`, `--text-3`. While streaming it shows the estimate with a "~" prefix |
+| Volume | Mute button + 80 px slider (`--download` fill). Hidden on narrow screens; the device volume is used there |
+| Speed of playback | 0.75×, 1×, 1.25×, 1.5×, 2× menu. This is playback only and separate from the voice speed |
+| Download | Pill button, `--download` outline. A menu offers MP3, plus WAV when signed in. Disabled until the job is done |
+
+Background `--surface-2`, 1 px top `--border`.
+
+### Waveform
+
+- Bars are 2 px wide with 1 px gaps, centred vertically, height = peak amplitude × 90% of the area height.
+- Colours: `--wave-played` before the playhead, `--wave-unplayed` after it, and `--wave-pending` for the part not yet generated while streaming (its length comes from the duration estimate).
+- **Streaming:** bars fill in from the left as chunks arrive; playback can start as soon as the first chunk is in.
+- **Seeking:** click or drag to seek. Seeking past the generated part jumps to its end. Arrow keys move 5 s when the waveform has focus.
+- **Empty:** a flat line with "Your audio will appear here" in `--text-3`.
+
+---
+
+## 9. Voice settings panel
+
+```
+VOICE SETTINGS
+LANGUAGE        [ American English      ▾ ]
+VOICE           [ Heart   A  ♀           ▾ ] [▶]
+MIX WITH        [ None                   ▾ ]
+                 Heart 70% ───────●─── 30% Bella
+SPEED                  1.0×
+                0.5× ───────●─────── 2.0×
+▸ Advanced
+  PITCH                +0 st
+                −6 ───────●─────── +6
+                                    [Reset]
+```
+
+| Control | Details |
+|---|---|
+| Language | Select with the 7 languages. Changing it switches to that language's default voice and clears the mix voice |
+| Voice | Select listing voices with a quality grade badge (`--accent-soft` chip: A, B−, C+ …) and gender icon; ordered by grade |
+| Preview | 32 px icon button; plays a stored sample of the voice. Pressing it again stops |
+| Mix with | Optional second voice of the same language. When set, a ratio slider appears (10–90%, step 10), labelled with both voice names |
+| Speed | Value in `--type-value`, `--accent-hover`; slider 0.5–2.0, step 0.05; double-click the value to reset to 1.0 |
+| Advanced (accordion) | Pitch slider −6 to +6 semitones, step 0.5 |
+| Reset | Text button restoring the language's defaults |
+
+All settings are remembered in `localStorage`. Sliders show their value while dragging and support arrow keys (small step) and Page Up/Down (large step).
+
+---
+
+## 10. Dialogs and overlays
+
+All dialogs are centred on wide screens and full-height sheets on narrow screens, with `--radius-lg`, `--shadow-pop` and a 50% black backdrop. Escape and the backdrop close them; focus is trapped inside and returns to the opener on close.
+
+| Dialog | Contents |
+|---|---|
+| **Pronunciations** | Table of "Word" → "Say as" rows with add, edit and delete. A hint explains phonemes in slashes (`/kˈOkəɹO/`, English voices only). A **Test** button speaks the row. Saved to the account |
+| **Sign in** | Shown when a signed-out user tries a signed-in feature or hits the anonymous limit. Says what signing in unlocks (higher limits, files, history, pronunciations), then email-link and Google buttons |
+| **Cancel long job** | Confirmation only for jobs over 2 minutes of audio: "Stop generating? The audio so far will be discarded." |
+| **Keyboard shortcuts** | Opened with `?`; lists [§14](#14-keyboard-shortcuts) |
+
+---
+
+## 11. Toasts and messages
+
+Toasts appear at the bottom centre, above the player bar, stack up to three, and close by themselves after 5 s (errors stay until dismissed). Each has an icon, a message and an optional action.
+
+| Kind | Icon / colour | Example |
+|---|---|---|
+| Info | `info`, `--text` | "Text cleaned. Undo to revert." **Undo** |
+| Success | `check-circle`, `--status-ok` | "Audio ready: 1m 26s." **Download** |
+| Warning | `alert-triangle`, `--status-busy` | "You're at 90% of today's limit." |
+| Error | `alert-octagon`, `--status-error` | "Couldn't open this PDF: it has no selectable text." |
+
+### API error messages
+
+| Code | Message shown | Action |
+|---|---|---|
+| `invalid_input` | The API's message, e.g. "Choose a voice for this language." | — |
+| `too_long` | "This text is over your limit of 20,000 characters per request." | Generate selection |
+| `quota_exceeded` | "You've used today's 100,000 characters. The limit resets at midnight UTC." | Sign in (anonymous only) |
+| `rate_limited` | "Too many requests. Try again in a few seconds." | — |
+| `busy` | "The service is busy right now. Try again in a minute." | Retry |
+| `not_found` | "This audio has expired." | — |
+| `internal` | "Something went wrong on our side. Please try again." | Retry |
+| connection lost | "Connection lost. Reconnecting…" (keeps audio already received) | — |
+
+---
+
+## 12. History page
+
+- A list of the last 7 days of generations, newest first, grouped by day.
+- The input text is never stored, so each row shows voice, language, duration, character count and time, e.g. "Heart · US English · 1m 26s · 1,204 chars · 14:32".
+- Row actions: play inline, download, and **Use these settings** (copies voice, mix, speed and pitch into the Studio).
+- Expired rows aren't shown. Empty state: "Nothing here yet. Audio you generate is kept for 7 days."
+
+---
+
+## 13. States and transitions
+
+```
+IDLE ──Generate──► QUEUED ──first chunk──► STREAMING ──done──► READY
+  ▲                  │                        │                  │
+  │               cancel / error           cancel / error        │ edit text or settings
+  └──────────────────┴────────────────────────┴──────────────────┘ (READY keeps the audio until the next Generate)
+```
+
+| State | Generate button | Editor and settings | Player | Status |
+|---|---|---|---|---|
+| **Idle** | Enabled ("Generate") | Editable | Empty or previous audio | Ready |
+| **Queued** | Becomes **Cancel** (`--danger` outline); "Waiting… 2 ahead" below | Read-only | Empty | Busy |
+| **Streaming** | **Cancel** with progress fill (percent) | Read-only | Plays as chunks arrive; Download disabled | Busy: "Generating 42%" |
+| **Ready** | Enabled | Editable | Full waveform, seek, Download enabled | Ready; success toast |
+| **Cancelled** | Enabled | Editable | Audio discarded | Ready; info toast |
+| **Error** | Enabled | Editable | Audio so far kept if any, Download disabled | Error; error toast |
+
+While a job runs, leaving the page asks for confirmation for anonymous users (their job can't be found again). Signed-in users can leave; the result appears in History.
+
+---
+
+## 14. Keyboard shortcuts
+
+| Keys (Windows / macOS) | Action |
+|---|---|
+| Ctrl + Enter / ⌘ + Enter | Generate (or generate selection) |
+| Esc | Cancel generation / close dialog |
+| Ctrl + Space / ⌃ + Space | Play / pause (also Space when the editor isn't focused) |
+| ← / → (player focused) | Seek 5 s |
+| Ctrl + O / ⌘ + O | Open file |
+| Ctrl + Shift + L / ⌘ + Shift + L | Clean text |
+| Ctrl + Z, Ctrl + Y / ⌘ + Z, ⌘ + Shift + Z | Undo, redo |
+| Ctrl + = / Ctrl + − | Editor zoom |
+| Ctrl + S / ⌘ + S | Download MP3 (when ready) |
+| ? | Show shortcuts |
+
+Shortcuts never override the browser's own when the matching feature isn't available (for example, Ctrl + S does nothing special before audio exists).
+
+---
+
+## 15. Accessibility
+
+- Every control is reachable and usable with the keyboard, in visual order, with a visible 2 px `--accent` focus ring (`:focus-visible`).
+- Icon-only buttons have `aria-label`s and tooltips.
+- Status changes (queued, generating percentage at 25% steps, ready, errors) are announced through one polite `aria-live` region.
+- Sliders are native `<input type="range">` with `aria-valuetext` ("1.25 times", "plus 2 semitones").
+- The waveform is a `role="slider"` for the playhead with the current and total time as its value text.
+- Colour is never the only signal: status has text, limit warnings have text, waveform progress also shows the time.
+- Works at 200% browser zoom without loss of content.
+- Tested with keyboard only, NVDA (Windows) and VoiceOver (macOS and iOS) before launch.

@@ -1,10 +1,8 @@
 # Kokoro TTS Web: Stage 1 Plan (MVP launch)
 
-> **Goal:** put Kokoro TTS Studio on the web for the first ~1,000 users at a running cost of **about $40–120 a month**, while reusing the existing `core/` engine and keeping a clear path to Stage 2 (GPU, more users).
+> **Goal:** launch a text-to-speech web app built on the open Kokoro-82M model for the first ~1,000 users, at a running cost of **about $40–120 a month**, with a clear path to Stage 2 (GPU, more users).
 >
 > **Status:** proposal, October 2026. All prices are approximate list prices and should be checked before you buy anything.
->
-> **Repositories:** the web app lives in this repo (`web-text-to-speech`). The engine code (`core/`) comes from the desktop repo, [`text-to-speech-app`](https://github.com/Mohanavadivelu/text-to-speech-app); see [§6](#6-repository-layout) for how it is shared.
 
 ---
 
@@ -14,7 +12,7 @@
 2. [Target numbers](#2-target-numbers)
 3. [Architecture](#3-architecture)
 4. [Technology choices](#4-technology-choices)
-5. [Reusing `core/`](#5-reusing-core)
+5. [Speech engine](#5-speech-engine)
 6. [Repository layout](#6-repository-layout)
 7. [API design](#7-api-design)
 8. [Job flow and streaming](#8-job-flow-and-streaming)
@@ -40,14 +38,14 @@
 
 | Feature | Notes |
 |---|---|
-| Type or paste text and generate speech | Same 7 languages and 37 voices as the desktop app |
-| Voice, speed and pitch controls | Same ranges as the desktop app |
-| Voice mixing (two voices, 10–90%) | Already in `EngineBase.voice_style()` |
+| Type or paste text and generate speech | 7 languages and 37 voices |
+| Voice, speed and pitch controls | Speed 0.5–2.0×, pitch ±6 semitones |
+| Voice mixing (two voices, 10–90%) | Blends the two voices' style tables in the engine |
 | Live playback while generating | Audio starts within a few seconds; see [§8](#8-job-flow-and-streaming) |
 | Long texts (articles, chapters) | Background jobs with a progress bar and cancel |
 | Open `.txt`, `.md`, `.docx` and `.pdf` | Parsed on the server with size and time limits |
-| Clean text | `text_tools.clean_text()` |
-| Custom pronunciations | Saved per account instead of in `pronunciations.json` |
+| Clean text | Fixes pasted text: curly quotes, links, markdown symbols, lines broken mid-sentence in PDFs |
+| Custom pronunciations | Saved per account; plain spellings or phonemes |
 | Download MP3 | WAV for signed-in users |
 | History of recent generations | Signed-in users only, kept for 7 days |
 | Free use without an account | With tighter limits |
@@ -94,7 +92,7 @@
                             │                  Redis (job queue, rate limits, pub/sub)   │
                             │                    │  ▲                                     │
                             │                    ▼  │                                     │
-                            │                  worker ×N (core/ ONNX engine, model in RAM)│
+                            │                  worker ×N (ONNX engine, model in RAM)      │
                             └────────────┬─────────────────────────────┬──────────────────┘
                                          │                             │
                                          ▼                             ▼
@@ -118,9 +116,9 @@ The design follows four principles:
 |---|---|---|---|
 | Frontend | **React + Vite + TypeScript**, static build | Simple, cheap to host, no server rendering needed | Next.js (more than needed for this) |
 | Frontend hosting | **Cloudflare Pages** | Free, global CDN, same provider as DNS and R2 | Vercel, Netlify |
-| API | **FastAPI** (Python 3.12) | Same language as `core/`, async WebSockets, automatic OpenAPI docs | Flask (no native async) |
+| API | **FastAPI** (Python 3.12) | Same language as the speech engine, async WebSockets, automatic OpenAPI docs | Flask (no native async) |
 | Job queue | **arq** on Redis | Async, small, supports job abort, enough for this scale | RQ, Celery (heavier) |
-| Workers | Python processes running `core.engine_onnx.OnnxEngine` | Reuses the tested CPU engine as is | — |
+| Workers | Python processes running the speech engine ([§5](#5-speech-engine)) on ONNX Runtime (CPU) | No GPU needed at Stage 1 volume; the same model can move to GPU later | PyTorch (larger image, needs a GPU to be fast) |
 | Cache, rate limits, pub/sub | **Redis 7** (in Docker) | One service covers all three | Upstash (managed) |
 | Database + auth | **Supabase** (free tier) | Postgres plus email-link and Google sign-in with no auth code to write | Neon + Auth.js / Clerk |
 | Audio storage | **Cloudflare R2** | No egress fees; audio downloads are the main bandwidth cost | Backblaze B2, S3 (egress fees) |
@@ -132,43 +130,66 @@ The design follows four principles:
 
 ---
 
-## 5. Reusing `core/`
+## 5. Speech engine
 
-In the desktop repo, `core/` has no imports from `ui/`, and the Windows-only parts of `hardware.py`, `paths.py` and `gpu_pack.py` are already guarded with `sys.platform` checks. The engine should run on Linux with small changes.
+The engine is a Python package in `server/engine/`. It contains no web code: it turns text into audio and nothing else, so the worker, tests and benchmark scripts can all use it directly.
 
-| Module | Reuse | Changes needed |
-|---|---|---|
-| `engine_onnx.py` | As is | None. Run the worker with `mode="Maximum"` and set `intra_op_num_threads` from an env var (see [§16](#16-capacity-planning)). |
-| `tts_common.py` | As is | Add an optional **small first segment**: when streaming, make the first segment one sentence (~150 chars) so the first audio arrives quickly. Today the first segment can be up to 800 chars, which is roughly 15–20 s of CPU work. |
-| `voices.py` | As is | Expose the voice list through `GET /v1/voices`. |
-| `text_tools.py` | Mostly | `clean_text`, `estimate_seconds`, `count_words`, `apply_pronunciations` and `load_text_file` are reused. `load_pronunciations`, `save_pronunciations`, `load_draft` and `save_draft` stay desktop-only, because the web version keeps that data in Postgres. |
-| `model_store.py` | As is | Run `fetch_all(onnx_files())` once while building the Docker image, so containers never download at runtime. |
-| `paths.py` | Small change | Let `KOKORO_ROOT` (env var) override `ROOT`, so models live at `/app/models` in the container. |
-| `engine.py` | Not used on the server | Desktop logic for choosing the engine, battery state and the GPU pack. The worker uses `OnnxEngine` directly. |
-| `player.py`, `settings.py`, `logging_setup.py`, `gpu_pack.py`, `hardware.py` (battery/priority) | Not used on the server | — |
+### Pipeline
 
-The two changes to `tts_common.py` and `paths.py` are made **in the desktop repo first** and then synced here, so both apps keep running the same engine code. Both changes are harmless for the desktop app.
+```
+text ─► pronunciations ─► segments ─► G2P ─► phoneme packing ─► Kokoro-82M (ONNX) ─► speed / pitch ─► audio chunk
+                          ≤800 chars   misaki (English)   ≤510 per call   + voice style table               24 kHz mono
+                          first ≤150   espeak-ng (others)                                                    float32
+                          when streaming
+```
 
-**Dependencies:** this repo's `server/requirements.txt` lists only what the server needs:
-- engine: numpy, onnxruntime, soundfile, misaki, spacy, num2words, espeakng-loader, phonemizer-fork, loguru, python-docx, pypdf (same pins as the desktop `requirements.txt`)
+- **Segments:** text is split at paragraph and sentence boundaries into segments of up to 800 characters. When streaming, the **first segment is a single sentence of up to ~150 characters**, so the first audio is ready in 1–2 s instead of the 15–20 s a full 800-character segment takes on CPU.
+- **G2P:** misaki converts English (US and UK) to phonemes; espeak-ng handles Hindi, French, Italian, Spanish and Brazilian Portuguese.
+- **Phoneme packing:** sentences are packed into model calls of up to 510 phonemes, the model's limit. Kokoro's pacing depends on chunk length, so packing to the full length keeps the speech rate natural.
+- **Voices:** each voice is a style table. Mixing two voices is a weighted average of their tables (10–90%).
+- **Speed and pitch:** speed is a model input; pitch (±6 semitones) is a resample after synthesis, with speed compensated so the duration stays the same.
+- **Callbacks:** `generate()` takes `on_chunk(audio)`, `on_progress(percent)` and a `cancel_event`. Cancel is checked between segments and also stops a running model call through ONNX Runtime's `RunOptions.terminate`, so it takes effect in well under a second.
+- **Model loading:** each worker process loads the model once at startup and keeps it in memory (~1.2–1.6 GB while generating).
+
+### Modules
+
+| Module | Responsibility |
+|---|---|
+| `engine/synth.py` | `KokoroEngine`: model session, segmenting, packing, callbacks, cancel, measured real-time factor |
+| `engine/g2p.py` | misaki and espeak-ng set-up per language |
+| `engine/voices.py` | Languages, the 37 voices with quality grades, defaults, style tables and blending |
+| `engine/text.py` | `clean_text`, `count_words`, `estimate_seconds`, `apply_pronunciations`, and text extraction from `.txt/.md/.docx/.pdf` |
+| `engine/model_store.py` | Downloads the model and voices from Hugging Face at pinned revisions and checks each file's SHA-256 |
+| `engine/audio.py` | PCM16 conversion, MP3 and WAV encoding |
+
+### Dependencies
+
+`server/requirements.txt` pins:
+- engine: numpy, onnxruntime, soundfile, misaki, spacy, num2words, espeakng-loader, phonemizer-fork, loguru, python-docx, pypdf
 - server: fastapi, uvicorn, arq, redis, boto3 (for R2), PyJWT and sentry-sdk
-- not needed: customtkinter, tkinterdnd2, sounddevice (desktop UI and local playback)
 
-**Ahead of time in the Docker image:** install `espeak-ng` (apt), install the spaCy English model that misaki needs, and download the Kokoro ONNX model and voices. The image will be roughly 1.5 GB, and containers start in seconds with no network calls.
+### Built into the Docker image
 
-**Desktop parity check:** for a fixed set of test sentences, compare server output with desktop output using the same spectral-correlation check the GPU pack uses. Expect at least 0.997.
+The image installs `espeak-ng` (apt) and the spaCy English model misaki needs, and downloads the Kokoro ONNX model and voices with `model_store` during the build. It will be roughly 1.5 GB, and containers start in seconds with no network calls.
+
+### Reference-audio tests
+
+A fixed set of sentences (at least one per language) is synthesised and compared with stored reference clips using spectral correlation, which must be at least 0.997. This catches silent changes in the voice when onnxruntime, misaki, spaCy or espeak-ng are upgraded.
 
 ---
 
 ## 6. Repository layout
 
-The web app has its own repo. The desktop app stays in `text-to-speech-app`, untouched apart from the two small engine changes in [§5](#5-reusing-core).
-
 ```
 web-text-to-speech/
-├── core/                      engine modules synced from the desktop repo (do not edit here)
-│   └── UPSTREAM               desktop repo commit the copy came from
 ├── server/
+│   ├── engine/                speech engine (§5); no web code
+│   │   ├── synth.py
+│   │   ├── g2p.py
+│   │   ├── voices.py
+│   │   ├── text.py
+│   │   ├── model_store.py
+│   │   └── audio.py
 │   ├── api/
 │   │   ├── main.py            FastAPI app, routers, CORS, Sentry
 │   │   ├── auth.py            Supabase JWT verification, anonymous IDs
@@ -178,42 +199,34 @@ web-text-to-speech/
 │   │   ├── routes_user.py     history, pronunciations
 │   │   └── schemas.py         Pydantic request/response models
 │   ├── worker/
-│   │   ├── main.py            arq WorkerSettings, loads model once at startup
-│   │   ├── synth.py           calls OnnxEngine.generate(), streams chunks to Redis
-│   │   ├── encode.py          float32 → PCM16 chunks, MP3/Opus files
+│   │   ├── main.py            arq WorkerSettings, loads the engine once at startup
+│   │   ├── jobs.py            runs a job: engine → Redis chunks → R2
 │   │   └── storage.py         R2 upload and signed URLs
 │   ├── db/migrations/         SQL migrations (Supabase)
-│   ├── tests/
+│   ├── tests/                 includes the reference audio clips
 │   ├── Dockerfile             one image, two commands (api / worker)
 │   ├── docker-compose.yml     caddy, api, worker, redis
 │   ├── Caddyfile
 │   └── requirements.txt
 ├── web/
 │   ├── src/
-│   │   ├── pages/             Studio, History, Sign in
-│   │   ├── components/        TextEditor, VoicePicker, Player, Waveform, Pronunciations
+│   │   ├── pages/             Studio, History, Sign in, About, Privacy, Terms
+│   │   ├── components/        TextEditor, VoicePanel, PlayerBar, Waveform, Pronunciations, Toast
 │   │   ├── audio/             streaming player (Web Audio API)
+│   │   ├── styles/tokens.css  design tokens from DESIGN.md
 │   │   └── api/               typed client generated from OpenAPI
 │   ├── index.html
 │   └── package.json
 ├── docs/
-│   ├── DESIGN.md              desktop UI spec (source of the Studio Dark theme)
+│   ├── DESIGN.md              web UI design spec
 │   ├── WEB_STAGE1_PLAN.md     this document
 │   └── DEVELOPMENT_PLAN.md    task-by-task build plan
-├── scripts/
-│   └── sync_core.py           copies the engine modules from the desktop repo
-└── .github/workflows/         CI and deploy
+├── scripts/                   benchmark, voice previews, backups
+├── .github/workflows/         CI and deploy
+├── CHANGELOG.md
+├── SECURITY.md
+└── README.md
 ```
-
-### Sharing the engine with the desktop repo
-
-| Option | Verdict |
-|---|---|
-| **Synced copy** of the needed `core/` modules, with the source commit recorded in `core/UPSTREAM` | **Stage 1 choice.** Simple, works with any build tool, and Docker builds need only this repo. The cost is running one script when the engine changes, which is rare. |
-| Git submodule of the whole desktop repo | Pulls in the desktop UI and build scripts, and submodules are easy to get wrong in CI |
-| `core` published as a pip package (`kokoro-core`) installed by both apps | Best long term; worth doing once both apps change the engine often (Stage 2) |
-
-`scripts/sync_core.py` copies only the modules the server uses (`engine_onnx.py`, `tts_common.py`, `voices.py`, `text_tools.py`, `model_store.py`, `paths.py`, `hardware.py`, `__init__.py`) from a desktop checkout, writes the commit hash into `core/UPSTREAM`, and fails if the desktop working tree has uncommitted changes. CI checks that no one edited `core/` without updating `UPSTREAM`.
 
 ---
 
@@ -224,14 +237,14 @@ All endpoints are under `/v1`. Requests and responses are JSON unless noted. Aut
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/health` | Liveness: checks Redis and the database, and that at least one worker is alive |
-| `GET` | `/v1/voices` | Languages, voices, grades and defaults (from `voices.py`) |
+| `GET` | `/v1/voices` | Languages, voices, grades and defaults (from `engine/voices.py`) |
 | `GET` | `/v1/me/usage` | Characters used today and the user's limits |
 | `POST` | `/v1/tts/jobs` | Create a generation job |
 | `GET` | `/v1/tts/jobs/{id}` | Job status, progress, download URL when finished |
 | `DELETE` | `/v1/tts/jobs/{id}` | Cancel a job |
 | `WS` | `/v1/tts/jobs/{id}/stream` | Live progress and audio chunks |
 | `POST` | `/v1/files/extract` | Upload `.txt/.md/.docx/.pdf` (multipart) and get the extracted text back |
-| `POST` | `/v1/text/clean` | Run `clean_text()` |
+| `POST` | `/v1/text/clean` | Clean pasted text (`engine/text.py`) |
 | `GET` / `PUT` | `/v1/me/pronunciations` | Read and replace the user's pronunciation list |
 | `GET` | `/v1/me/history` | Recent jobs with fresh signed download URLs |
 
@@ -253,8 +266,8 @@ All endpoints are under `/v1`. Requests and responses are JSON unless noted. Aut
 ```
 
 Validation:
-- `voice` and `blend_voice` must belong to `lang` (from `voices.py`)
-- `speed` 0.5–2.0, `pitch` −6 to +6 semitones, `blend_ratio` 0.1–0.9, matching the desktop app
+- `voice` and `blend_voice` must belong to `lang`
+- `speed` 0.5–2.0, `pitch` −6 to +6 semitones, `blend_ratio` 0.1–0.9
 - text length within the per-request limit for the user's tier ([§10](#10-accounts-limits-and-abuse-protection))
 - `turnstile_token` is required for anonymous users
 
@@ -295,7 +308,7 @@ browser                api                    redis                 worker
    │                    │ enqueue ──────────────►│                      │
    │◄── 201 {id} ───────│                        │◄──── pick up job ────│
    │ WS /stream ───────►│ subscribe job:{id} ───►│                      │
-   │                    │                        │◄─ publish chunk ─────│ OnnxEngine.generate(
+   │                    │                        │◄─ publish chunk ─────│ engine.generate(
    │◄── binary PCM ─────│◄───────────────────────│                      │   on_chunk=…, on_progress=…)
    │◄── progress ───────│◄───────────────────────│◄─ publish progress ──│
    │                    │                        │                      │ encode MP3 → upload R2
@@ -304,9 +317,9 @@ browser                api                    redis                 worker
 
 Details:
 
-- **Chunks:** `EngineBase.generate()` already accepts `on_chunk` and `on_progress`. The worker converts each float32 chunk to PCM16 (48 KB per second of audio) and publishes it to the Redis channel `job:{id}`. It also appends the chunk to a short-lived Redis list, so a browser that reconnects can replay what it missed.
-- **First audio quickly:** with the small first segment from [§5](#5-reusing-core), the first chunk is about one sentence. On a modern CPU that takes roughly 1–2 s.
-- **Cancel:** `DELETE /jobs/{id}` sets `cancel:{id}` in Redis. A small thread in the worker watches for it and sets the `cancel_event` that `generate()` already checks. `OnnxEngine` already stops the running ONNX call through `RunOptions.terminate`.
+- **Chunks:** the worker passes `on_chunk` and `on_progress` callbacks to the engine's `generate()`. The worker converts each float32 chunk to PCM16 (48 KB per second of audio) and publishes it to the Redis channel `job:{id}`. It also appends the chunk to a short-lived Redis list, so a browser that reconnects can replay what it missed.
+- **First audio quickly:** with the short first segment from [§5](#5-speech-engine), the first chunk is about one sentence. On a modern CPU that takes roughly 1–2 s.
+- **Cancel:** `DELETE /jobs/{id}` sets `cancel:{id}` in Redis. A small thread in the worker watches for it and sets the engine's `cancel_event`, which also stops the running model call ([§5](#5-speech-engine)).
 - **Timeouts:** a job is killed after `max(60 s, 3 × estimated time)`. arq retries a job once only if the worker crashed, not if the input was bad.
 - **Final file:** when generation finishes, the worker encodes MP3 (64 kbps mono) with `soundfile`, uploads it to R2 at `audio/users/{user_id}/{job_id}.mp3` (or `audio/anon/{anon_id}/…`) and stores the key in Postgres. The browser receives a signed URL that is valid for 1 hour.
 - **Queue fairness:** each user can have at most 1 running job and 2 queued. When the queue holds more than 30 jobs, the API returns `busy` to anonymous users first.
@@ -316,7 +329,7 @@ Details:
 
 ## 9. Web frontend
 
-The web app should feel like the desktop app (Studio Dark theme from `docs/DESIGN.md`), with these screens:
+The full visual spec (Studio Dark theme, layouts, components, states, shortcuts) is in [DESIGN.md](DESIGN.md). The screens are:
 
 | Screen | Contents |
 |---|---|
@@ -328,7 +341,7 @@ The web app should feel like the desktop app (Studio Dark theme from `docs/DESIG
 Implementation notes:
 - **Streaming playback:** an `AudioContext` at 24 kHz; each PCM16 frame becomes an `AudioBuffer` and is scheduled right after the previous one. When the job finishes, the player switches to the MP3 URL so the user can seek and download.
 - **Voice previews:** generate one short sample per voice once at build time, store them in R2 and serve them as static files. Previews then cost no compute.
-- **Draft saving:** keep the unsent text in `localStorage`, like the desktop draft.
+- **Draft saving:** keep the unsent text in `localStorage`, so a refresh doesn't lose it.
 - **Long texts:** show progress and an estimated finish time. Generation continues on the server if the user closes the tab; signed-in users find the result in History.
 - **Mobile:** single-column layout below 768 px, with voice settings in a bottom sheet.
 - **Accessibility:** full keyboard use, labelled controls, honour reduced-motion for the waveform.
@@ -422,7 +435,7 @@ Stage 1 doesn't need a separate staging server. Use a staging Cloudflare Pages p
 
 ### CI/CD (GitHub Actions)
 
-1. On every pull request: lint (ruff, eslint), unit tests, build the Docker image, and run the parity test from [§5](#5-reusing-core) on a short sample.
+1. On every pull request: lint (ruff, eslint), unit tests, build the Docker image, and run the reference-audio tests from [§5](#5-speech-engine).
 2. On merge to `main`:
    - build and push the image to GitHub Container Registry (tagged with the commit SHA)
    - Cloudflare Pages builds `web/` automatically
@@ -443,7 +456,7 @@ Keep secrets in a `.env` file on the VM (readable only by root) and in GitHub Ac
 | Errors | Sentry (API, worker, frontend) | New issue, or error rate spike |
 | Queue | Worker logs queue length and wait time every minute; a small `/v1/admin/stats` page | Average wait over 30 s for 10 min |
 | Server | Hetzner graphs + `node_exporter` into Grafana Cloud (free tier) | CPU > 85% for 15 min, disk > 80% |
-| Throughput | Each job logs chars, audio seconds and real-time factor (already logged by `generate()`) | Real-time factor drops below 2× |
+| Throughput | Each job logs chars, audio seconds and real-time factor (measured by the engine) | Real-time factor drops below 2× |
 | Cost | Monthly check of Hetzner, R2 and Supabase dashboards | — |
 
 **Backups:**
@@ -480,13 +493,13 @@ Keep secrets in a `.env` file on the VM (readable only by root) and in GitHub Ac
 | ONNX Runtime | MIT | No restrictions |
 | pypdf, python-docx, FastAPI, React | BSD/MIT | No restrictions |
 
-Some voice IDs (`af_alloy`, `af_nova`, `am_echo`, …) share names with voices from other providers. Show the display names from `voices.py`, and don't suggest any connection to those providers in marketing.
+Some voice IDs (`af_alloy`, `af_nova`, `am_echo`, …) share names with voices from other providers. Show the display names from `engine/voices.py`, and don't suggest any connection to those providers in marketing.
 
 ---
 
 ## 16. Capacity planning
 
-Measured on the desktop: the CPU engine runs at **about 3.8–4.8× real time** on a 20-thread i7-12700H using all threads, and at about 75% of that speed with 4 threads (`core/hardware.py`).
+Measured with ONNX Runtime on CPU: the engine runs at **about 3.8–4.8× real time** on a 20-thread Intel i7-12700H using all threads, and at about 75% of that speed with 4 threads.
 
 Assumptions for a 4-vCPU server worker (2 threads per worker, 2 workers):
 - each worker runs at about **1.5–2.5× real time**
@@ -558,7 +571,7 @@ For one developer, working full time:
 
 | Week | Phase | Deliverables |
 |---|---|---|
-| 1 | **Engine on the server** | `sync_core.py` and the first engine sync; `KOKORO_ROOT` in `paths.py`; small first segment in `tts_common.py`; Dockerfile with espeak-ng, the spaCy model and Kokoro baked in; worker that runs a job from Redis and uploads MP3 to R2; parity test passes on Linux |
+| 1 | **Speech engine + worker** | `server/engine/` with the short first segment for streaming; reference-audio tests; Dockerfile with espeak-ng, the spaCy model and Kokoro built in; worker that runs a job from Redis and uploads MP3 to R2 |
 | 1–2 | **API** | FastAPI with `/voices`, `/tts/jobs`, WebSocket streaming, cancel, `/files/extract`, `/text/clean`; arq queue; Redis rate limits and quotas; OpenAPI docs; unit tests |
 | 2–3 | **Web frontend** | Studio screen: editor, voice settings, mixing, streaming player with waveform, download; file open and clean text; Studio Dark theme; mobile layout |
 | 3 | **Accounts** | Supabase Auth (email link + Google); history; saved pronunciations; Turnstile on anonymous use; database migrations with row-level security |
@@ -575,7 +588,7 @@ Part time (about 15 hours a week), expect 8–10 weeks.
 
 - [ ] Unit: request validation, limit checks, cache key, PCM16 conversion, MP3 encoding
 - [ ] Engine: one short sentence in each of the 7 languages produces non-empty audio
-- [ ] Parity: server audio matches desktop audio (spectral correlation ≥ 0.997)
+- [ ] Reference audio: engine output matches the stored clips (spectral correlation ≥ 0.997)
 - [ ] Integration: create job → WebSocket receives chunks → `done` URL downloads a valid MP3
 - [ ] Cancel: a cancelled long job stops within 2 s and frees the worker
 - [ ] Limits: going over the per-request, daily and per-minute limits returns the right error codes
@@ -607,7 +620,7 @@ Plan Stage 2 (GPU workers, managed database, two or more API instances) when **a
 | Users | over ~3,000 monthly active, or a paid plan launched |
 | Uptime needs | paying users need more than one server |
 
-Because workers only share Redis, Postgres and R2 with the rest of the system, Stage 2 is mostly adding a GPU worker type (the existing `engine_torch.py` or ONNX Runtime with CUDA) that reads from the same queue. The API and frontend don't change.
+Because workers only share Redis, Postgres and R2 with the rest of the system, Stage 2 is mostly adding a GPU worker type (ONNX Runtime with the CUDA provider) that reads from the same queue. The API and frontend don't change.
 
 ---
 
@@ -628,4 +641,3 @@ Because workers only share Redis, Postgres and R2 with the rest of the system, S
 2. **Main audience region** (decides the server location).
 3. **Anonymous use**: allow it at launch, or require sign-in from day one? Requiring sign-in makes abuse much easier to control.
 4. **Is a paid plan expected soon?** If yes, design the `tier` field and limits config with paid tiers in mind now.
-5. **When to turn `core` into a shared pip package** instead of a synced copy. Recommendation: at Stage 2, or sooner if the engine starts changing often.
