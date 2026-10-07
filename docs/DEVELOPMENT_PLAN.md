@@ -138,7 +138,7 @@ Builds `server/engine/` as described in §5 of the Stage 1 plan.
 
 | ID | Task | Est. | Done when |
 |---|---|---|---|
-| M5.1 | Database migrations from §10 (`profiles`, `jobs`, `pronunciations`, `usage_daily`) with row-level security | 0.5 | Migrations apply to a fresh Supabase project; RLS tests pass |
+| M5.1 | Database migrations in `supabase/migrations/` from §10 (`profiles`, `jobs`, `pronunciations`, `usage_daily`) with row-level security | 0.5 | Migrations apply to a fresh Supabase project; RLS tests pass |
 | M5.2 | Auth: Supabase sign-in (email link + Google) in the frontend; the API verifies the JWT; the anonymous ID is an HMAC-signed cookie | 0.5 | Signed-in and anonymous requests are both identified correctly; a forged cookie is rejected |
 | M5.3 | Job records in Postgres (settings and lengths only, **never the text**) | 0.25 | Logs and the database contain no user text (checked by a test) |
 | M5.4 | Full limits from §10: per-request characters, characters per day, running/queued jobs, requests per minute; values in config; `GET /v1/me/usage` | 0.5 | Tests for each limit and tier |

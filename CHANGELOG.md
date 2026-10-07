@@ -13,3 +13,4 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - Python tooling: `pyproject.toml` with ruff and pytest settings, pinned `server/requirements.txt` and `requirements-dev.txt`, and a first `/v1/health` endpoint with a test (M0.2).
 - Web app scaffold: Vite, React 19, TypeScript (strict), oxlint, Prettier and Vitest, with a `/v1` proxy to the local API (M0.3).
 - CI on GitHub Actions: Python lint and tests, web lint, format, typecheck, tests and build, and a Docker build with a health check. Dependabot for pip, npm, Docker and Actions (M0.4).
+- Supabase CLI project (`supabase/config.toml`, `supabase/migrations/`) with local auth redirects for the Vite dev server; `.env.example` uses Supabase's publishable and secret keys and JWKS token verification (M0.5).

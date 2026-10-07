@@ -202,7 +202,6 @@ web-text-to-speech/
 │   │   ├── main.py            arq WorkerSettings, loads the engine once at startup
 │   │   ├── jobs.py            runs a job: engine → Redis chunks → R2
 │   │   └── storage.py         R2 upload and signed URLs
-│   ├── db/migrations/         SQL migrations (Supabase)
 │   ├── tests/                 includes the reference audio clips
 │   ├── Dockerfile             one image, two commands (api / worker)
 │   ├── docker-compose.yml     caddy, api, worker, redis
@@ -217,6 +216,7 @@ web-text-to-speech/
 │   │   └── api/               typed client generated from OpenAPI
 │   ├── index.html
 │   └── package.json
+├── supabase/                  Supabase CLI project: config.toml, migrations/
 ├── docs/
 │   ├── DESIGN.md              web UI design spec
 │   ├── WEB_STAGE1_PLAN.md     this document
@@ -382,7 +382,7 @@ pronunciations  (user_id uuid, word text, say text, primary key (user_id, word))
 usage_daily     (subject text, day date, chars int, jobs int, primary key (subject, day))
 ```
 
-The `jobs` table does not store the input text (see [§14](#14-security-and-privacy)). Row-level security makes each user able to read only their own rows. The API writes with the service key.
+The `jobs` table does not store the input text (see [§14](#14-security-and-privacy)). Row-level security makes each user able to read only their own rows. The API writes with the secret key (`sb_secret_…`), which is never sent to the browser.
 
 ---
 
@@ -444,7 +444,7 @@ Stage 1 doesn't need a separate staging server. Use a staging Cloudflare Pages p
 
 ### Secrets
 
-Keep secrets in a `.env` file on the VM (readable only by root) and in GitHub Actions secrets: Supabase URL and service key, the JWT secret, R2 keys, the Turnstile secret and the Sentry DSN. Never commit them.
+Keep secrets in a `.env` file on the VM (readable only by root) and in GitHub Actions secrets: the Supabase secret key and database password, R2 keys, the Turnstile secret and the Sentry DSN. Never commit them.
 
 ---
 
@@ -475,7 +475,7 @@ Keep secrets in a `.env` file on the VM (readable only by root) and in GitHub Ac
 - **PDF and DOCX parsing:** pypdf and python-docx run inside the worker container, which has no secrets apart from R2 and Redis access. Keep both libraries up to date (Dependabot).
 - **No text retention:** don't store or log user text. Logs record lengths and settings only. This removes the main privacy risk and makes the privacy policy simple. The cache key is a hash, so the text can't be recovered from it.
 - **Signed URLs:** R2 objects are private; downloads use pre-signed URLs that expire after 1 hour.
-- **Auth:** verify Supabase JWTs on the API (signature, expiry, audience). The anonymous ID is an HMAC-signed cookie.
+- **Auth:** verify Supabase JWTs on the API against the project's public signing keys (JWKS at `/auth/v1/.well-known/jwks.json`), checking signature, expiry and audience. The browser only ever gets the publishable key. The anonymous ID is an HMAC-signed cookie.
 - **CORS:** allow only the production domain and Pages preview domains.
 - **Headers:** HSTS, a CSP that allows only your own origin plus Supabase, Turnstile and Sentry.
 - **Dependencies:** Dependabot for Python, npm and the Docker base image, plus a monthly rebuild.

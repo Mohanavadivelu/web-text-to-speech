@@ -49,6 +49,7 @@ server/
   api/        FastAPI app: jobs, streaming, files, accounts, limits
   worker/     job runner: engine → live chunks → R2
 web/          React frontend
+supabase/     Supabase CLI project: auth config and database migrations
 docs/         design and plans
 scripts/      benchmarks, voice previews, backups
 ```
@@ -102,6 +103,13 @@ npm run dev                                    # http://localhost:5173 (proxies 
 ```bash
 ruff check . && ruff format --check . && pytest
 cd web && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build
+```
+
+**Supabase** (accounts and database), once per machine:
+
+```bash
+npx supabase login                                     # opens the browser
+npx supabase link --project-ref fewhxkyzbmwtegekiyxp   # asks for the database password
 ```
 
 Copy `.env.example` to `.env` for local settings. The full local setup is in [§12 of the development plan](docs/DEVELOPMENT_PLAN.md#12-local-development-setup).
