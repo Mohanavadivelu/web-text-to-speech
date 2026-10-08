@@ -128,7 +128,7 @@ Panels use a 1 px `--border` instead of shadows; only floating elements get `--s
 │                                                   │ Voice  [▶ preview]    │
 │ editor (fills height)                             │ Mix voice + ratio     │
 │                                                   │ Speed                 │
-│                                                   │ Pitch (Advanced)      │
+│                                                   │ Pitch                 │
 │ footer: 1,204 chars · ~1m 26s · ▓▓▓░ 1.2k/20k     │                       │
 │                              [ Generate  ⌘↵ ]     │                       │  flex
 ├───────────────────────────────────────────────────┴───────────────────────┤
