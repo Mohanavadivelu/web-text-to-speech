@@ -24,7 +24,7 @@ export function About() {
   return (
     <Page title="About">
       <p>
-        Kokoro TTS turns text into natural-sounding speech in your browser. Paste text or open a
+        Narravo turns text into natural-sounding speech in your browser. Paste text or open a
         document, choose one of 37 voices in 7 languages, and listen while it&apos;s being made.
       </p>
       <h2>How it works</h2>

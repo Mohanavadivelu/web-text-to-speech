@@ -49,7 +49,7 @@ def cache_key(body: JobCreate, pronunciations: list[dict]) -> str:
 async def _download_url(svc: Services, job_id: str, key: str) -> str:
     """Signed link that plays in the browser and saves as a named file when downloaded."""
     extension = key.rsplit(".", 1)[-1]
-    return await asyncio.to_thread(svc.storage.signed_url, key, f"kokoro-{job_id}.{extension}")
+    return await asyncio.to_thread(svc.storage.signed_url, key, f"narravo-{job_id}.{extension}")
 
 
 async def _best_effort(what: str, coroutine) -> None:

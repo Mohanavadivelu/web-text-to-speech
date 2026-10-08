@@ -1,6 +1,6 @@
-# Kokoro TTS Web
+# Narravo
 
-Natural-sounding text-to-speech in the browser, powered by the open [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) model. Paste text or open a document, pick a voice, and hear it within seconds.
+Narravo: natural-sounding text-to-speech in the browser, powered by the open [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) model. Paste text or open a document, pick a voice, and hear it within seconds.
 
 > **Status:** early development. M0–M5 are done: setup, speech engine, workers, API, web Studio and accounts. Next is M6 (production deployment). See the [development plan](docs/DEVELOPMENT_PLAN.md).
 

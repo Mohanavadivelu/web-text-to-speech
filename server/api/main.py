@@ -72,7 +72,7 @@ def create_app(services: Services | None = None) -> FastAPI:
             await app.state.services.db.close()
 
     app = FastAPI(
-        title="Kokoro TTS Web API",
+        title="Narravo API",
         version="0.1.0",
         description="Text-to-speech jobs with live streaming. Errors always look like "
         '`{"error": {"code": ..., "message": ...}}`.',

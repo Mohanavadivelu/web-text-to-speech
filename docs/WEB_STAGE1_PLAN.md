@@ -1,4 +1,4 @@
-# Kokoro TTS Web: Stage 1 Plan (MVP launch)
+# Narravo: Stage 1 Plan (MVP launch)
 
 > **Goal:** launch a text-to-speech web app built on the open Kokoro-82M model for the first ~1,000 users, at a running cost of **about $40–120 a month**, with a clear path to Stage 2 (GPU, more users).
 >

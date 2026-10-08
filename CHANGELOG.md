@@ -30,6 +30,8 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - `GET /v1/config` (the visitor's limits) and download links that save as `kokoro-<job>.mp3`.
 - Browser tests (Playwright) for desktop and phone, run in CI against the Docker stack, plus unit tests for the streaming player.
 
+- Renamed to **Narravo**; the top bar shows "Narravo Studio" and no page links (History and About moved to the side panel and the account menu). Download files are named `narravo-<job>.mp3`.
+- Studio redesign: Settings | History tabs in the side panel; the voice as a card that opens a voice picker (search, language and gender filters, sort, preview every voice, mixing); exact number boxes next to Speed and Pitch; a reading font in the editor with the tools along the bottom; on phones and tablets, voice, settings and history buttons right above Generate.
 - The player bar stays on every page and keeps playing while you move between Studio, History and About; playing an item from History loads it into the same player. Pitch is always visible (no "Advanced" section).
 - Accounts (M5), on local Supabase in development: email-link sign-in; signed-in limits (20,000 characters per request, 100,000 a day, 3 active jobs, 30 requests a minute per account) and anonymous limits (2,000 / 10,000 / 2 / 10 per IP); a usage meter; WAV downloads, document uploads, a 7-day History page and saved pronunciations for signed-in users.
 - Database schema (`supabase/migrations`) with row-level security: users read only their own jobs, pronunciations and profile; nobody reads usage statistics. Job text is never stored.

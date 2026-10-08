@@ -161,7 +161,7 @@ def _download(f: RemoteFile, dest: Path, timeout: int = 60) -> None:
         part.unlink()
         have = 0
     if have < f.size:
-        req = urllib.request.Request(f.url, headers={"User-Agent": "kokoro-tts-web"})  # noqa: S310
+        req = urllib.request.Request(f.url, headers={"User-Agent": "narravo"})  # noqa: S310
         if have:
             req.add_header("Range", f"bytes={have}-")
         with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (fixed https URL)

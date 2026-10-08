@@ -1,10 +1,18 @@
-# Kokoro TTS Web: UI Design Specification
+# Narravo: UI Design Specification
 
 > **Theme:** Studio Dark (default) with a matching light theme
 > **Stack:** React + TypeScript, plain CSS with design tokens (`web/src/styles/tokens.css`)
 > **Fonts:** Inter (interface), JetBrains Mono (editor, times, numbers), from Google Fonts with system fallbacks
 > **Icons:** [Lucide](https://lucide.dev) line icons, 1.5 px stroke; no emoji in the interface
 > **Supported widths:** 360 px and up; no horizontal page scrolling at any width
+> **Studio redesign (October 2026), which takes precedence over the older sections below where they differ:**
+> - **Name:** the app is **Narravo**; the top bar shows **Narravo Studio** (logo + name, links to the Studio) with no page links. History and About are reached from the side panel and the account menu (History, Pronunciations, About, Sign out).
+> - **Side panel tabs:** **Settings | History**. History lists the last few items (play in the player bar, download) with "See all history →" to the full page; visitors see a sign-in prompt. About · Privacy · Terms links sit at the bottom of the panel.
+> - **Voice card + picker:** the chosen voice is a card (avatar initial, name, gender, grade, language tag) with its own ▶ preview; clicking it opens **Choose a voice**: search, language filter, gender chips, sort by grade or name, a ▶ preview on every row, and the mix voice and ratio in the footer. Full screen on phones.
+> - **Number boxes:** Speed and Pitch each have a slider and a small box for an exact value (clamped and rounded on Enter or blur). Pitch is always visible.
+> - **Editor:** a reading font (Inter, 16 px × zoom), no inner box; tools (Open, Clean, zoom), counts, limit meter and Generate in one row along the bottom.
+> - **Phones and tablets (< 1024 px):** above Generate, a row with the voice button (opens the picker), ⚙ (speed and pitch in a sheet) and 🕘 (recent history in a sheet).
+>
 > **Built so far (M5):** everything below except the playback-speed menu and the shortcuts dialog. Sign in, History and Pronunciations are full pages (§10's dialogs became pages: simpler on phones), and sign-in is by email link (Google arrives with the hosted project in M6). The editor has no undo/redo buttons: Ctrl+Z works while typing, and Clean text / Open file offer Undo in their toast.
 
 ---
@@ -148,7 +156,7 @@ Panels use a 1 px `--border` instead of shadows; only floating elements get `--s
 
 ```
 ┌──────────────────────────┐
-│ ☰  Kokoro TTS     ◐  👤 │  top bar, 52 px; nav in the menu
+│ ◼ Narravo Studio  ◐  👤 │  top bar, 52 px
 ├──────────────────────────┤
 │ [Heart · US · 1.0×  ▾]   │  voice summary chip → opens bottom sheet
 │ toolbar (icons only)     │
@@ -172,7 +180,7 @@ Panels use a 1 px `--border` instead of shadows; only floating elements get `--s
 
 | Element | Details |
 |---|---|
-| Logo + name | 28 px accent square with a waveform icon, then "Kokoro TTS" in `--type-title`. Links to Studio |
+| Logo + name | 28 px accent square with a waveform icon, then "Narravo Studio" in `--type-title` ("Studio" in `--text-2`). Links to the Studio |
 | Navigation | Studio, History (History only when signed in). The current page has an accent underline |
 | Usage meter | Signed in and anonymous: a small bar with "12.4k / 100k today" in `--type-small`. Turns `--status-busy` above 80% and `--status-error` at 100% |
 | Theme toggle | Cycles System → Dark → Light; the icon shows the current choice |

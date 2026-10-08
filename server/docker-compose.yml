@@ -13,7 +13,7 @@ x-app: &app
   build:
     context: ..
     dockerfile: server/Dockerfile
-  image: kokoro-tts-web:dev
+  image: narravo:dev
   env_file:
     - path: ../.env
       required: false

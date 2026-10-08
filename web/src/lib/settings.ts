@@ -23,7 +23,7 @@ export const DEFAULT_SETTINGS: VoiceSettings = {
   pitch: 0,
 }
 
-const KEY = 'kokoro.voice-settings'
+const KEY = 'narravo.voice-settings'
 
 export function useVoiceSettings() {
   const [settings, setSettings] = useState<VoiceSettings>(() => ({

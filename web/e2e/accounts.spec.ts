@@ -10,7 +10,11 @@ test('sign in with an email link, generate, find it in History with a WAV', asyn
   await expect(toast(page, /^Audio ready/)).toBeVisible()
   await expect(page.getByRole('link', { name: 'WAV' })).toHaveAttribute('href', /\.wav/)
 
-  await page.getByRole('link', { name: 'History' }).click()
+  // The Studio's History tab lists it; the full page is one click away
+  await page.getByRole('tab', { name: 'History' }).click()
+  await expect(page.getByRole('tabpanel').getByRole('listitem')).toHaveCount(1)
+  await page.screenshot({ path: 'test-results/history-tab.png' })
+  await page.getByRole('link', { name: 'See all history →' }).click()
   await expect(page.getByRole('heading', { name: 'History' })).toBeVisible()
   await expect(page.getByRole('listitem')).toHaveCount(1)
   await expect(page.getByRole('listitem').getByRole('link', { name: 'WAV' })).toBeVisible()
@@ -63,19 +67,20 @@ test('the player keeps playing across pages, and History plays in it', async ({ 
   const seconds = async () => Number(await position.getAttribute('aria-valuenow'))
 
   // Move to About while it plays: the player bar is still there and still moving
-  await page.getByRole('link', { name: 'About' }).first().click()
+  await page.getByRole('link', { name: 'About' }).click() // footer of the side panel
   await expect(page.getByRole('heading', { name: 'About' })).toBeVisible()
   const before = await seconds()
   await expect.poll(seconds).toBeGreaterThan(before)
 
   // Play the item from History: it loads into the same player bar, with its name
-  await page.getByRole('link', { name: 'History' }).first().click()
+  await page.getByRole('button', { name: /^Account:/ }).click()
+  await page.getByRole('menuitem', { name: 'History' }).click()
   await page.getByRole('listitem').getByRole('button', { name: 'Play' }).click()
   await expect(page.getByLabel('Player').getByText('Heart · US English')).toBeVisible()
   await expect(page.getByRole('listitem').getByRole('button', { name: 'Pause' })).toBeVisible()
 
   // ...and keeps playing back in the Studio
-  await page.getByRole('link', { name: 'Studio' }).click()
+  await page.getByRole('link', { name: 'Narravo Studio, home' }).click()
   await expect(page.getByLabel('Player').getByText('Heart · US English')).toBeVisible()
   await page.screenshot({ path: 'test-results/player-across-pages.png' })
 })

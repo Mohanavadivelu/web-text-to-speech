@@ -13,18 +13,10 @@ import { DEFAULT_SETTINGS, type VoiceSettings } from '../lib/settings'
 import { save } from '../lib/storage'
 import { formatCount, formatDuration } from '../lib/text'
 import { useToast } from '../lib/toast'
+import { LANGUAGE_NAMES, voiceName } from '../lib/voices'
 import styles from './AccountPages.module.css'
 
 const INBOX = import.meta.env.DEV ? import.meta.env.VITE_MAIL_INBOX_URL : undefined
-const LANGUAGE_NAMES: Record<string, string> = {
-  a: 'US English',
-  b: 'UK English',
-  h: 'Hindi',
-  f: 'French',
-  i: 'Italian',
-  e: 'Spanish',
-  p: 'Portuguese',
-}
 
 /** Pages that need an account send visitors to sign in first. */
 function useRequireAccount(): boolean {
@@ -172,7 +164,7 @@ export function History() {
       speed: item.speed,
       pitch: item.pitch,
     }
-    save('kokoro.voice-settings', settings)
+    save('narravo.voice-settings', settings)
     navigate('/')
   }
 
@@ -241,11 +233,6 @@ export function History() {
       </div>
     </div>
   )
-}
-
-function voiceName(id: string): string {
-  const name = id.split('_')[1] ?? id
-  return name.charAt(0).toUpperCase() + name.slice(1)
 }
 
 function groupByDay(items: HistoryItem[]): [string, HistoryItem[]][] {

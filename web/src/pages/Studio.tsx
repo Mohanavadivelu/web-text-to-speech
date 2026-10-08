@@ -1,12 +1,15 @@
 // The Studio: type or open text, pick a voice, hear it while it's being made.
 
-import { AudioLines, ChevronDown } from 'lucide-react'
+import { ChevronDown, History, Settings2 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api, ApiError, type Config, type Language } from '../api/client'
+import { Link } from '../components/Link'
+import { RecentHistory } from '../components/RecentHistory'
 import { Sheet } from '../components/Sheet'
 import { TextEditor, type TextEditorHandle } from '../components/TextEditor'
 import { VoicePanel } from '../components/VoicePanel'
+import { VoiceAvatar, VoicePicker } from '../components/VoicePicker'
 import { errorToast } from '../lib/errors'
 import { useMe } from '../lib/me'
 import { usePlayback } from '../lib/playback'
@@ -19,8 +22,8 @@ import { formatCount } from '../lib/text'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import styles from './Studio.module.css'
 
-const DRAFT_KEY = 'kokoro.draft'
-const ZOOM_KEY = 'kokoro.zoom'
+const DRAFT_KEY = 'narravo.draft'
+const ZOOM_KEY = 'narravo.zoom'
 const FALLBACK_CONFIG: Config = {
   max_chars: 2000,
   max_upload_mb: 5,
@@ -40,7 +43,9 @@ export function Studio() {
   const [settings, setSettings] = useVoiceSettings()
   const [text, setText] = useState(() => load(DRAFT_KEY, ''))
   const [zoom, setZoom] = useState(() => load(ZOOM_KEY, 1))
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheet, setSheet] = useState<'settings' | 'history' | null>(null)
+  const [sideTab, setSideTab] = useState<'settings' | 'history'>('settings')
+  const [pickerOpen, setPickerOpen] = useState(false)
 
   const playback = usePlayback()
   const { speech } = playback
@@ -158,7 +163,7 @@ export function Studio() {
       if (mod && e.key === 'Enter') {
         e.preventDefault()
         generate()
-      } else if (e.key === 'Escape' && busy && !sheetOpen) {
+      } else if (e.key === 'Escape' && busy && !sheet && !pickerOpen) {
         void speech.cancel()
       } else if (mod && e.key.toLowerCase() === 'o') {
         e.preventDefault()
@@ -173,30 +178,58 @@ export function Studio() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [generate, clean, busy, sheetOpen, speech])
+  }, [generate, clean, busy, sheet, pickerOpen, speech])
 
   const lang = languages.find((l) => l.code === settings.lang)
   const voice = lang?.voices.find((v) => v.id === settings.voice)
-  const voiceSummary = voice ? `${voice.name} · ${lang?.name} · ${settings.speed}×` : 'Voice'
+  const loadProblem = loadError ? <p className={styles.loadError}>{loadError}</p> : null
 
-  const panel = (
-    <VoicePanel languages={languages} settings={settings} onChange={setSettings} disabled={busy} />
+  const settingsPanel = loadProblem ??
+    (languages.length === 0 ? <p className={styles.loading}>Loading voices…</p> : null) ?? (
+      <VoicePanel
+        languages={languages}
+        settings={settings}
+        onChange={setSettings}
+        onOpenPicker={() => setPickerOpen(true)}
+        disabled={busy}
+      />
+    )
+
+  // Phones and tablets: voice, settings and history right above Generate
+  const controls = wide ? undefined : (
+    <>
+      <button
+        className={styles.voiceChip}
+        onClick={() => setPickerOpen(true)}
+        aria-label={`Voice: ${voice?.name ?? ''}. Change voice`}
+        disabled={busy}
+      >
+        {voice && <VoiceAvatar name={voice.name} size={24} />}
+        <span className={styles.voiceChipText}>
+          {voice?.name ?? 'Voice'} · {lang?.name ?? ''}
+        </span>
+        <ChevronDown size={16} />
+      </button>
+      <button
+        className={styles.squareButton}
+        onClick={() => setSheet('settings')}
+        aria-label="Voice settings"
+      >
+        <Settings2 size={18} />
+      </button>
+      <button
+        className={styles.squareButton}
+        onClick={() => setSheet('history')}
+        aria-label="Recent history"
+      >
+        <History size={18} />
+      </button>
+    </>
   )
 
   return (
     <div className={styles.studio}>
       <div className={styles.main}>
-        {!wide && (
-          <button
-            className={styles.voiceChip}
-            onClick={() => setSheetOpen(true)}
-            aria-label={`Voice settings: ${voiceSummary}`}
-          >
-            <AudioLines size={16} />
-            <span>{voiceSummary}</span>
-            <ChevronDown size={16} />
-          </button>
-        )}
         <TextEditor
           ref={editor}
           text={text}
@@ -214,18 +247,68 @@ export function Studio() {
           onOpenFile={(f) => void openFile(f)}
           onClean={() => void clean()}
           documentTypes={config.document_types}
+          controls={controls}
         />
         {wide && (
           <aside className={styles.side}>
-            {loadError ? <p className={styles.loadError}>{loadError}</p> : panel}
+            <div className={styles.tabs} role="tablist" aria-label="Side panel">
+              {(['settings', 'history'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  role="tab"
+                  id={`tab-${tab}`}
+                  aria-selected={sideTab === tab}
+                  aria-controls={`panel-${tab}`}
+                  className={styles.tab}
+                  onClick={() => setSideTab(tab)}
+                >
+                  {tab === 'settings' ? 'Settings' : 'History'}
+                </button>
+              ))}
+            </div>
+            <div
+              className={styles.tabPanel}
+              role="tabpanel"
+              id={`panel-${sideTab}`}
+              aria-labelledby={`tab-${sideTab}`}
+            >
+              {sideTab === 'settings' ? settingsPanel : <RecentHistory />}
+            </div>
+            <InfoLinks />
           </aside>
         )}
       </div>
       {!wide && (
-        <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Voice settings">
-          {loadError ? <p className={styles.loadError}>{loadError}</p> : panel}
-        </Sheet>
+        <>
+          <Sheet open={sheet === 'settings'} onClose={() => setSheet(null)} title="Voice settings">
+            <h2 className={styles.sheetTitle}>Voice settings</h2>
+            {settingsPanel}
+            <InfoLinks />
+          </Sheet>
+          <Sheet open={sheet === 'history'} onClose={() => setSheet(null)} title="Recent history">
+            <h2 className={styles.sheetTitle}>History</h2>
+            <RecentHistory />
+          </Sheet>
+        </>
+      )}
+      {pickerOpen && (
+        <VoicePicker
+          languages={languages}
+          settings={settings}
+          onChoose={(patch) => setSettings((s) => ({ ...s, ...patch }))}
+          onClose={() => setPickerOpen(false)}
+        />
       )}
     </div>
+  )
+}
+
+function InfoLinks() {
+  return (
+    <nav className={styles.infoLinks} aria-label="About Narravo">
+      <Link href="/about">About</Link>
+      <Link href="/privacy">Privacy</Link>
+      <Link href="/terms">Terms</Link>
+    </nav>
   )
 }

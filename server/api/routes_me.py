@@ -57,7 +57,7 @@ async def history(
             if not key:
                 return None
             extension = key.rsplit(".", 1)[-1]
-            return svc.storage.signed_url(key, f"kokoro-{row['id']}.{extension}")
+            return svc.storage.signed_url(key, f"narravo-{row['id']}.{extension}")
 
         url, wav_url = await asyncio.gather(
             asyncio.to_thread(link, row["storage_key"]), asyncio.to_thread(link, row["wav_key"])

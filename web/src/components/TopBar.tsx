@@ -1,11 +1,12 @@
-// Top bar (DESIGN.md §6): navigation, status, today's usage, theme and account.
+// Top bar (DESIGN.md §6): Narravo Studio, status, today's usage, theme and account.
+// History and About are reached from the Studio's side panel and the account menu.
 
 import { AudioLines, LogOut, Monitor, Moon, Sun } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
 import { useAuth } from '../lib/auth'
 import { useMe } from '../lib/me'
-import { navigate, usePath } from '../lib/router'
+import { navigate } from '../lib/router'
 import { useAppStatus } from '../lib/status'
 import { formatCount, formatShort } from '../lib/text'
 import { useTheme } from '../lib/theme'
@@ -16,7 +17,6 @@ const THEME_ICON = { system: Monitor, dark: Moon, light: Sun }
 const THEME_LABEL = { system: 'Theme: system', dark: 'Theme: dark', light: 'Theme: light' }
 
 export function TopBar() {
-  const path = usePath()
   const { status } = useAppStatus()
   const { me } = useMe()
   const [theme, cycleTheme] = useTheme()
@@ -27,25 +27,14 @@ export function TopBar() {
 
   return (
     <header className={styles.bar}>
-      <Link href="/" className={styles.brand} aria-label="Kokoro TTS, home">
+      <Link href="/" className={styles.brand} aria-label="Narravo Studio, home">
         <span className={styles.logo} aria-hidden>
           <AudioLines size={18} />
         </span>
-        <span className={styles.name}>Kokoro TTS</span>
+        <span className={styles.name}>
+          Narravo <span className={styles.product}>Studio</span>
+        </span>
       </Link>
-      <nav className={styles.nav} aria-label="Main">
-        <Link href="/" aria-current={path === '/' ? 'page' : undefined}>
-          Studio
-        </Link>
-        {me.signed_in && (
-          <Link href="/history" aria-current={path === '/history' ? 'page' : undefined}>
-            History
-          </Link>
-        )}
-        <Link href="/about" aria-current={path === '/about' ? 'page' : undefined}>
-          About
-        </Link>
-      </nav>
       <div className={styles.spacer} />
       <span className={styles.status} title={status.text}>
         <span className={`${styles.dot} ${styles[status.level]}`} aria-hidden />
@@ -126,6 +115,9 @@ function Account() {
           </button>
           <button role="menuitem" onClick={() => go('/pronunciations')}>
             Pronunciations
+          </button>
+          <button role="menuitem" onClick={() => go('/about')}>
+            About
           </button>
           <button
             role="menuitem"

@@ -1,4 +1,5 @@
-// Text editor panel (DESIGN.md §7): toolbar, editor, counts and the Generate button.
+// Text editor panel (DESIGN.md §7): a calm writing area in a reading font, with the
+// tools, counts and the Generate button along the bottom.
 
 import { FileUp, Play, Sparkles, Square, ZoomIn, ZoomOut } from 'lucide-react'
 import {
@@ -36,8 +37,8 @@ interface Props {
   onOpenFile: (file: File) => void
   onClean: () => void
   documentTypes: string[]
-  /** Shown on medium screens to open the voice settings drawer. */
-  voiceButton?: ReactNode
+  /** Phones and tablets: voice, settings and history buttons, just above Generate. */
+  controls?: ReactNode
 }
 
 export const TextEditor = forwardRef<TextEditorHandle, Props>(function TextEditor(props, ref) {
@@ -57,7 +58,7 @@ export const TextEditor = forwardRef<TextEditorHandle, Props>(function TextEdito
     onOpenFile,
     onClean,
     documentTypes,
-    voiceButton,
+    controls,
   } = props
   const area = useRef<HTMLTextAreaElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -102,52 +103,11 @@ export const TextEditor = forwardRef<TextEditorHandle, Props>(function TextEdito
       }}
       onDrop={onDrop}
     >
-      <div className={styles.toolbar} role="toolbar" aria-label="Text tools">
-        <ToolButton
-          label="Open file (Ctrl+O)"
-          onClick={() => fileInput.current?.click()}
-          disabled={busy}
-        >
-          <FileUp size={18} />
-        </ToolButton>
-        <ToolButton label="Clean text (Ctrl+Shift+L)" onClick={onClean} disabled={busy || empty}>
-          <Sparkles size={18} />
-        </ToolButton>
-        <span className={styles.divider} />
-        <ToolButton
-          label="Smaller text"
-          onClick={() => onZoom(Math.max(0.8, zoom - 0.1))}
-          disabled={zoom <= 0.8}
-        >
-          <ZoomOut size={18} />
-        </ToolButton>
-        <ToolButton
-          label="Larger text"
-          onClick={() => onZoom(Math.min(1.6, zoom + 0.1))}
-          disabled={zoom >= 1.6}
-        >
-          <ZoomIn size={18} />
-        </ToolButton>
-        <span className={styles.spacer} />
-        {voiceButton}
-        <input
-          ref={fileInput}
-          type="file"
-          accept={documentTypes.join(',')}
-          hidden
-          onChange={(e) => {
-            const file = e.target.files?.[0]
-            if (file) onOpenFile(file)
-            e.target.value = ''
-          }}
-        />
-      </div>
-
       <div className={styles.editorWrap}>
         <textarea
           ref={area}
           className={styles.editor}
-          style={{ fontSize: `${Math.round(15 * zoom)}px` }}
+          style={{ fontSize: `${Math.round(16 * zoom)}px` }}
           value={text}
           onChange={(e) => onTextChange(e.target.value)}
           onSelect={(e) => {
@@ -168,6 +128,44 @@ export const TextEditor = forwardRef<TextEditorHandle, Props>(function TextEdito
       </div>
 
       <div className={styles.footer}>
+        <div className={styles.tools} role="toolbar" aria-label="Text tools">
+          <ToolButton
+            label="Open file (Ctrl+O)"
+            onClick={() => fileInput.current?.click()}
+            disabled={busy}
+          >
+            <FileUp size={18} />
+          </ToolButton>
+          <ToolButton label="Clean text (Ctrl+Shift+L)" onClick={onClean} disabled={busy || empty}>
+            <Sparkles size={18} />
+          </ToolButton>
+          <span className={styles.divider} />
+          <ToolButton
+            label="Smaller text"
+            onClick={() => onZoom(Math.max(0.8, zoom - 0.1))}
+            disabled={zoom <= 0.8}
+          >
+            <ZoomOut size={18} />
+          </ToolButton>
+          <ToolButton
+            label="Larger text"
+            onClick={() => onZoom(Math.min(1.6, zoom + 0.1))}
+            disabled={zoom >= 1.6}
+          >
+            <ZoomIn size={18} />
+          </ToolButton>
+          <input
+            ref={fileInput}
+            type="file"
+            accept={documentTypes.join(',')}
+            hidden
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) onOpenFile(file)
+              e.target.value = ''
+            }}
+          />
+        </div>
         <span className={styles.counts}>
           {formatCount(length)} characters · {formatCount(countWords(text))} words ·{' '}
           {formatEstimate(estimateSeconds(text, lang, speed))}
@@ -182,6 +180,7 @@ export const TextEditor = forwardRef<TextEditorHandle, Props>(function TextEdito
           {formatShort(length)} / {formatShort(maxChars)}
         </span>
         <span className={styles.spacer} />
+        {controls && <div className={styles.controls}>{controls}</div>}
         {busy ? (
           <button className={`${styles.generate} ${styles.cancel}`} onClick={onCancel}>
             <span className={styles.progress} style={{ width: `${progress}%` }} aria-hidden />

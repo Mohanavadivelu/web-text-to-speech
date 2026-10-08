@@ -6,7 +6,7 @@ import { load, save } from './storage'
 
 export type ThemeChoice = 'system' | 'dark' | 'light'
 const ORDER: ThemeChoice[] = ['system', 'dark', 'light']
-const KEY = 'kokoro.theme'
+const KEY = 'narravo.theme'
 
 export function applyTheme(choice: ThemeChoice): void {
   const root = document.documentElement

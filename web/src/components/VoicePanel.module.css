@@ -1,19 +1,12 @@
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-}
-
-.heading {
-  margin: 0;
-  font: var(--type-label);
-  color: var(--text-2);
 }
 
 .fields {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-6);
   margin: 0;
   padding: 0;
   border: none;
@@ -30,6 +23,13 @@
   gap: var(--space-2);
 }
 
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
 .label {
   font: 600 11px/16px var(--font-ui);
   letter-spacing: 0.06em;
@@ -37,41 +37,78 @@
   color: var(--text-2);
 }
 
-.row {
+.voiceCard {
   display: flex;
   gap: var(--space-2);
 }
 
-.row select {
+.voiceMain {
   flex: 1;
   min-width: 0;
-}
-
-select {
-  appearance: none;
-  height: 40px;
-  padding: 0 36px 0 var(--space-3);
-  font: var(--type-body);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  text-align: left;
   color: var(--text);
-  background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%239898b8' stroke-width='2'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E")
-      no-repeat right 12px center,
-    var(--surface-2);
+  background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   cursor: pointer;
 }
 
-select:hover {
+.voiceMain:hover {
   border-color: var(--border-strong);
 }
 
-.iconButton {
+.voiceText {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.voiceName {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--type-label);
+  font-size: 14px;
+}
+
+.muted {
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.grade {
+  font: 600 11px/16px var(--font-ui);
+  color: var(--accent-hover);
+  background: var(--accent-soft);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.langTag {
+  align-self: flex-start;
+  font: var(--type-small);
+  color: var(--text-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+}
+
+.swap {
+  flex: none;
+  color: var(--text-3);
+}
+
+.previewButton {
   flex: none;
   display: grid;
   place-items: center;
-  width: 40px;
-  height: 40px;
+  width: 44px;
   color: var(--text);
   background: var(--surface-3);
   border: 1px solid var(--border);
@@ -79,15 +116,55 @@ select:hover {
   cursor: pointer;
 }
 
-.iconButton:hover {
+.previewButton:hover {
   border-color: var(--border-strong);
 }
 
-.value {
-  font: var(--type-value);
+.mixLink {
+  align-self: flex-start;
+  padding: var(--space-1) 0;
+  font: var(--type-label);
   color: var(--accent-hover);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.mixLink:hover {
+  text-decoration: underline;
+}
+
+.numberBox {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: 30px;
+  padding: 0 var(--space-2);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.numberBox:focus-within {
+  border-color: var(--accent);
+}
+
+.numberBox input {
+  width: 3.5em;
+  height: 100%;
+  padding: 0;
+  font: 600 13px/20px var(--font-mono);
   font-variant-numeric: tabular-nums;
-  user-select: none;
+  text-align: right;
+  color: var(--text);
+  background: none;
+  border: none;
+  outline: none;
+}
+
+.unit {
+  font: var(--type-small);
+  color: var(--text-3);
 }
 
 .sliderLabels {
@@ -106,16 +183,14 @@ input[type='range'] {
 }
 
 .reset {
-  align-self: flex-start;
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  font: var(--type-label);
+  font: var(--type-small);
   color: var(--text-2);
   background: none;
   border: none;
   padding: var(--space-1) var(--space-2);
-  margin-left: calc(-1 * var(--space-2));
   border-radius: var(--radius-sm);
   cursor: pointer;
 }
