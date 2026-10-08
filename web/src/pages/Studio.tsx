@@ -4,20 +4,18 @@ import { AudioLines, ChevronDown } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { api, ApiError, type Config, type Language } from '../api/client'
-import { useSpeechJob, type SpeechJob } from '../audio/useSpeechJob'
-import { PlayerBar } from '../components/PlayerBar'
 import { Sheet } from '../components/Sheet'
 import { TextEditor, type TextEditorHandle } from '../components/TextEditor'
 import { VoicePanel } from '../components/VoicePanel'
 import { errorToast } from '../lib/errors'
 import { useMe } from '../lib/me'
+import { usePlayback } from '../lib/playback'
 import { navigate } from '../lib/router'
 import { reconcile, useVoiceSettings } from '../lib/settings'
-import { useAppStatus } from '../lib/status'
 import { load, save } from '../lib/storage'
 import { useToast } from '../lib/toast'
 import { getBotToken } from '../lib/turnstile'
-import { formatDuration, formatCount } from '../lib/text'
+import { formatCount } from '../lib/text'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import styles from './Studio.module.css'
 
@@ -31,9 +29,8 @@ const FALLBACK_CONFIG: Config = {
 
 export function Studio() {
   const toast = useToast()
-  const { me, refresh: refreshMe } = useMe()
+  const { me } = useMe()
   const maxChars = me.limits.max_chars
-  const { setStatus } = useAppStatus()
   const wide = useMediaQuery('(min-width: 1024px)')
   const editor = useRef<TextEditorHandle>(null)
 
@@ -44,29 +41,9 @@ export function Studio() {
   const [text, setText] = useState(() => load(DRAFT_KEY, ''))
   const [zoom, setZoom] = useState(() => load(ZOOM_KEY, 1))
   const [sheetOpen, setSheetOpen] = useState(false)
-  const [announcement, setAnnouncement] = useState('')
 
-  const onFinished = useCallback(
-    (job: SpeechJob) => {
-      refreshMe() // today's usage changed
-      if (job.status === 'ready') {
-        const seconds = job.player?.duration || job.job?.audio_seconds || 0
-        toast({
-          kind: 'success',
-          message: `Audio ready${seconds ? `: ${formatDuration(seconds)}` : ''}.`,
-        })
-        setAnnouncement('Audio ready.')
-      } else if (job.status === 'cancelled') {
-        toast({ kind: 'info', message: 'Stopped.' })
-        setAnnouncement('Generation stopped.')
-      } else if (job.status === 'error' && job.error) {
-        toast(errorToast(job.error))
-        setAnnouncement(job.error.message)
-      }
-    },
-    [toast, refreshMe],
-  )
-  const speech = useSpeechJob(onFinished)
+  const playback = usePlayback()
+  const { speech } = playback
   const busy = speech.status === 'queued' || speech.status === 'streaming'
 
   // Voices and limits
@@ -95,36 +72,6 @@ export function Studio() {
   }, [text])
   useEffect(() => save(ZOOM_KEY, zoom), [zoom])
 
-  // Status dot, screen-reader announcements and the leave-page warning
-  useEffect(() => {
-    if (speech.status === 'queued') {
-      setStatus({
-        level: 'busy',
-        text: speech.queuePosition ? `Waiting · ${speech.queuePosition} ahead` : 'Starting…',
-      })
-    } else if (speech.status === 'streaming') {
-      setStatus({ level: 'busy', text: `Generating ${speech.progress}%` })
-    } else if (speech.status === 'error') {
-      setStatus({ level: 'error', text: 'Error' })
-    } else {
-      setStatus({ level: 'ok', text: 'Ready' })
-    }
-  }, [speech.status, speech.progress, speech.queuePosition, setStatus])
-
-  // Announce progress in quarters while streaming; other moments come from `announcement`
-  const quarter = Math.floor(speech.progress / 25) * 25
-  const liveMessage =
-    speech.status === 'streaming' && quarter > 0 && quarter < 100
-      ? `Generating, ${quarter}%`
-      : announcement
-
-  useEffect(() => {
-    if (!busy) return
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
-    window.addEventListener('beforeunload', warn)
-    return () => window.removeEventListener('beforeunload', warn)
-  }, [busy])
-
   const generate = useCallback(() => {
     if (busy) return
     const source = editor.current?.selection() ?? text
@@ -136,8 +83,7 @@ export function Studio() {
       })
       return
     }
-    setAnnouncement('Generating speech…')
-    void speech.generate(
+    playback.generate(
       {
         text: source,
         lang: settings.lang,
@@ -150,7 +96,7 @@ export function Studio() {
       },
       me.signed_in ? undefined : getBotToken,
     )
-  }, [busy, text, maxChars, settings, speech, toast, me.signed_in])
+  }, [busy, text, maxChars, settings, playback, toast, me.signed_in])
 
   const replaceText = useCallback(
     (next: string, message: string) => {
@@ -209,18 +155,11 @@ export function Studio() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.ctrlKey || e.metaKey
-      const inField = (e.target as HTMLElement).closest('textarea, input, select')
       if (mod && e.key === 'Enter') {
         e.preventDefault()
         generate()
       } else if (e.key === 'Escape' && busy && !sheetOpen) {
         void speech.cancel()
-      } else if ((mod && e.code === 'Space') || (e.code === 'Space' && !inField && speech.player)) {
-        if (!speech.player) return
-        e.preventDefault()
-        const state = speech.player.state
-        if (state === 'playing' || state === 'buffering') speech.player.pause()
-        else speech.player.play()
       } else if (mod && e.key.toLowerCase() === 'o') {
         e.preventDefault()
         editor.current?.openFilePicker()
@@ -282,20 +221,11 @@ export function Studio() {
           </aside>
         )}
       </div>
-      <PlayerBar
-        player={speech.player}
-        estimatedSeconds={speech.estimatedSeconds}
-        downloadUrl={speech.url}
-        wavUrl={speech.wavUrl}
-      />
       {!wide && (
         <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Voice settings">
           {loadError ? <p className={styles.loadError}>{loadError}</p> : panel}
         </Sheet>
       )}
-      <div className="visually-hidden" aria-live="polite">
-        {liveMessage}
-      </div>
     </div>
   )
 }

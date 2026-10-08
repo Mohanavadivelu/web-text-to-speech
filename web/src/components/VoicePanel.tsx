@@ -162,29 +162,26 @@ export function VoicePanel({ languages, settings, onChange, disabled }: Props) {
           </span>
         </label>
 
-        <details className={styles.advanced} open={settings.pitch !== 0 || undefined}>
-          <summary>Advanced</summary>
-          <label className={styles.field}>
-            <span className={styles.label}>Pitch</span>
-            <output className={styles.value}>
-              {settings.pitch > 0 ? '+' : ''}
-              {settings.pitch} st
-            </output>
-            <input
-              type="range"
-              min={-6}
-              max={6}
-              step={0.5}
-              value={settings.pitch}
-              aria-valuetext={`${settings.pitch > 0 ? 'plus ' : settings.pitch < 0 ? 'minus ' : ''}${Math.abs(settings.pitch)} semitones`}
-              onChange={(e) => set({ pitch: Number(e.target.value) })}
-            />
-            <span className={styles.sliderLabels}>
-              <span>−6</span>
-              <span>+6</span>
-            </span>
-          </label>
-        </details>
+        <label className={styles.field}>
+          <span className={styles.label}>Pitch</span>
+          <output className={styles.value}>
+            {settings.pitch > 0 ? '+' : ''}
+            {settings.pitch} st
+          </output>
+          <input
+            type="range"
+            min={-6}
+            max={6}
+            step={0.5}
+            value={settings.pitch}
+            aria-valuetext={`${settings.pitch > 0 ? 'plus ' : settings.pitch < 0 ? 'minus ' : ''}${Math.abs(settings.pitch)} semitones`}
+            onChange={(e) => set({ pitch: Number(e.target.value) })}
+          />
+          <span className={styles.sliderLabels}>
+            <span>−6</span>
+            <span>+6</span>
+          </span>
+        </label>
 
         <button
           type="button"

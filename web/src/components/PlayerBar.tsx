@@ -15,9 +15,11 @@ interface Props {
   downloadUrl: string | null
   /** Signed-in users also get a WAV. */
   wavUrl?: string | null
+  /** What's playing, when it isn't the Studio's job (e.g. an item from History). */
+  title?: string
 }
 
-export function PlayerBar({ player: source, estimatedSeconds, downloadUrl, wavUrl }: Props) {
+export function PlayerBar({ player: source, estimatedSeconds, downloadUrl, wavUrl, title }: Props) {
   const player = usePlayer(source)
   const [volume, setVolume] = useState(1)
   const [muted, setMuted] = useState(false)
@@ -47,6 +49,11 @@ export function PlayerBar({ player: source, estimatedSeconds, downloadUrl, wavUr
           <Play size={20} />
         )}
       </button>
+      {title && (
+        <span className={styles.title} title={title}>
+          {title}
+        </span>
+      )}
       <span className={styles.time}>{formatDuration(time)}</span>
       <Waveform
         levels={player?.levels ?? []}

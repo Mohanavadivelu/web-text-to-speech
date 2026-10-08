@@ -1,7 +1,9 @@
 import { ToastProvider } from './components/Toasts'
 import { TopBar } from './components/TopBar'
+import { AppPlayerBar } from './components/AppPlayerBar'
 import { AuthProvider } from './components/AuthProvider'
 import { MeProvider } from './components/MeProvider'
+import { PlaybackProvider } from './components/PlaybackProvider'
 import { History, Pronunciations, SignIn } from './pages/AccountPages'
 import { About, NotFound, Privacy, Terms } from './pages/InfoPages'
 import { Studio } from './pages/Studio'
@@ -26,12 +28,15 @@ export default function App() {
       <MeProvider>
         <StatusProvider>
           <ToastProvider>
-            <div className="app">
-              <TopBar />
-              <main className="content">
-                <Page />
-              </main>
-            </div>
+            <PlaybackProvider>
+              <div className="app">
+                <TopBar />
+                <main className="content">
+                  <Page />
+                </main>
+                <AppPlayerBar />
+              </div>
+            </PlaybackProvider>
           </ToastProvider>
         </StatusProvider>
       </MeProvider>

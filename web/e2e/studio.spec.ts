@@ -62,6 +62,8 @@ test('voice settings: language change picks its default voice, mixing shows the 
   await expect(page.getByLabel('Voice', { exact: true })).toHaveValue('bf_emma')
   await page.getByLabel('Mix with').selectOption({ label: 'George ♂' })
   await expect(page.getByText(/Emma \d+%/)).toBeVisible()
+  await expect(page.getByLabel('Pitch')).toBeVisible() // always shown, no 'Advanced' toggle
+  await expect(page.getByText('Advanced')).toHaveCount(0)
   await page.reload()
   await expect(page.getByLabel('Voice', { exact: true })).toHaveValue('bf_emma') // remembered
 })

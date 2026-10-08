@@ -50,3 +50,32 @@ test('sign out', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Sign in' })).toBeVisible()
   await expect(page.getByText(/\/ 10k today/)).toBeVisible()
 })
+
+test('the player keeps playing across pages, and History plays in it', async ({ page }) => {
+  await signIn(page)
+  await page
+    .getByLabel('Text to speak')
+    .fill(`This sentence is long enough to keep playing while we move between pages. ${Date.now()}`)
+  await page.getByRole('button', { name: /^Generate/ }).click()
+  await expect(toast(page, /^Audio ready/)).toBeVisible()
+
+  const position = page.getByRole('slider', { name: 'Playback position' })
+  const seconds = async () => Number(await position.getAttribute('aria-valuenow'))
+
+  // Move to About while it plays: the player bar is still there and still moving
+  await page.getByRole('link', { name: 'About' }).first().click()
+  await expect(page.getByRole('heading', { name: 'About' })).toBeVisible()
+  const before = await seconds()
+  await expect.poll(seconds).toBeGreaterThan(before)
+
+  // Play the item from History: it loads into the same player bar, with its name
+  await page.getByRole('link', { name: 'History' }).first().click()
+  await page.getByRole('listitem').getByRole('button', { name: 'Play' }).click()
+  await expect(page.getByLabel('Player').getByText('Heart · US English')).toBeVisible()
+  await expect(page.getByRole('listitem').getByRole('button', { name: 'Pause' })).toBeVisible()
+
+  // ...and keeps playing back in the Studio
+  await page.getByRole('link', { name: 'Studio' }).click()
+  await expect(page.getByLabel('Player').getByText('Heart · US English')).toBeVisible()
+  await page.screenshot({ path: 'test-results/player-across-pages.png' })
+})

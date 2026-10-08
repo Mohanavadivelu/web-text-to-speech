@@ -1,11 +1,13 @@
 // Sign in, History and Pronunciations.
 
 import { Download, Mail, Pause, Play, Plus, Settings2, Trash2 } from 'lucide-react'
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 
 import { api, ApiError, type HistoryItem, type Pronunciation } from '../api/client'
+import { usePlayer } from '../audio/usePlayer'
 import { Link } from '../components/Link'
 import { useAuth } from '../lib/auth'
+import { usePlayback } from '../lib/playback'
 import { navigate } from '../lib/router'
 import { DEFAULT_SETTINGS, type VoiceSettings } from '../lib/settings'
 import { save } from '../lib/storage'
@@ -121,8 +123,12 @@ export function History() {
   const toast = useToast()
   const [items, setItems] = useState<HistoryItem[] | null>(null)
   const [days, setDays] = useState(7)
-  const [playing, setPlaying] = useState<string | null>(null)
-  const audio = useRef<HTMLAudioElement | null>(null)
+  const playback = usePlayback()
+  const nowPlaying = usePlayer(
+    playback.showing === 'track' ? (playback.track?.player ?? null) : null,
+  )
+  const playingId =
+    nowPlaying && ['playing', 'buffering'].includes(nowPlaying.state) ? playback.track?.id : null
 
   useEffect(() => {
     if (!allowed) return
@@ -138,19 +144,22 @@ export function History() {
       })
   }, [allowed, toast])
 
-  useEffect(() => () => audio.current?.pause(), [])
-
   const toggle = (item: HistoryItem) => {
-    audio.current?.pause()
-    if (playing === item.id || !item.url) {
-      setPlaying(null)
+    if (!item.url) return
+    if (playback.showing === 'track' && playback.track?.id === item.id) {
+      // Same item: pause or resume it in the player bar
+      const player = playback.track.player
+      if (player.state === 'playing' || player.state === 'buffering') player.pause()
+      else player.play()
       return
     }
-    const next = new Audio(item.url)
-    next.onended = () => setPlaying(null)
-    audio.current = next
-    setPlaying(item.id)
-    void next.play().catch(() => setPlaying(null))
+    playback.playTrack({
+      id: item.id,
+      url: item.url,
+      wavUrl: item.wav_url,
+      seconds: item.audio_seconds,
+      title: `${voiceName(item.voice)} · ${LANGUAGE_NAMES[item.lang] ?? item.lang}`,
+    })
   }
 
   const applySettings = (item: HistoryItem) => {
@@ -194,9 +203,9 @@ export function History() {
                     <button
                       className={styles.play}
                       onClick={() => toggle(item)}
-                      aria-label={playing === item.id ? 'Pause' : 'Play'}
+                      aria-label={playingId === item.id ? 'Pause' : 'Play'}
                     >
-                      {playing === item.id ? <Pause size={16} /> : <Play size={16} />}
+                      {playingId === item.id ? <Pause size={16} /> : <Play size={16} />}
                     </button>
                     <span className={styles.meta}>
                       <strong>{voiceName(item.voice)}</strong>

@@ -30,6 +30,19 @@
   cursor: default;
 }
 
+.title {
+  flex: none;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--type-small);
+  color: var(--text-2);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--surface-3);
+}
+
 .time,
 .total {
   flex: none;
@@ -125,7 +138,8 @@
     gap: var(--space-2);
   }
   .volume,
-  .total {
+  .total,
+  .title {
     display: none;
   }
   .download span {

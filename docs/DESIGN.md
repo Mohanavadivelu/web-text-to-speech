@@ -232,6 +232,8 @@ Icon buttons are 32 px square (44 px on touch), `--radius-sm`, with a tooltip an
 
 Background `--surface-2`, 1 px top `--border`.
 
+The player bar is part of the app layout, not the Studio: it stays at the bottom of every page and keeps playing while you move between pages. It plays either the Studio's current job or a finished file from History (labelled with its voice and language); starting one pauses the other, and when a job finishes while History audio is playing, the "Audio ready" toast offers **Play** to switch back.
+
 ### Waveform
 
 - Bars are 2 px wide with 1 px gaps, centred vertically, height = peak amplitude × 90% of the area height.
@@ -252,8 +254,7 @@ MIX WITH        [ None                   ▾ ]
                  Heart 70% ───────●─── 30% Bella
 SPEED                  1.0×
                 0.5× ───────●─────── 2.0×
-▸ Advanced
-  PITCH                +0 st
+PITCH                  +0 st
                 −6 ───────●─────── +6
                                     [Reset]
 ```
@@ -265,7 +266,7 @@ SPEED                  1.0×
 | Preview | 32 px icon button; plays a stored sample of the voice. Pressing it again stops |
 | Mix with | Optional second voice of the same language. When set, a ratio slider appears (10–90%, step 10), labelled with both voice names |
 | Speed | Value in `--type-value`, `--accent-hover`; slider 0.5–2.0, step 0.05; double-click the value to reset to 1.0 |
-| Advanced (accordion) | Pitch slider −6 to +6 semitones, step 0.5 |
+| Pitch | Slider −6 to +6 semitones, step 0.5; always visible (no "Advanced" section) |
 | Reset | Text button restoring the language's defaults |
 
 All settings are remembered in `localStorage`. Sliders show their value while dragging and support arrow keys (small step) and Page Up/Down (large step).

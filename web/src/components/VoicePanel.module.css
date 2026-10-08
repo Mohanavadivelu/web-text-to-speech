@@ -105,17 +105,6 @@ input[type='range'] {
   cursor: pointer;
 }
 
-.advanced summary {
-  font: var(--type-label);
-  color: var(--text-2);
-  cursor: pointer;
-  padding: var(--space-1) 0;
-}
-
-.advanced[open] summary {
-  margin-bottom: var(--space-3);
-}
-
 .reset {
   align-self: flex-start;
   display: flex;
