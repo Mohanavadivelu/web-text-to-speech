@@ -51,7 +51,7 @@ class FakeStorage:
             raise KeyError(source_key)
         self.objects[dest_key] = self.objects[source_key]
 
-    def signed_url(self, key):
+    def signed_url(self, key, filename=None):
         return f"https://storage.test/{key}?signature=abc"
 
 

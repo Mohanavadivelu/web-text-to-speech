@@ -15,6 +15,33 @@
         "title": "Body_extract_v1_files_extract_post",
         "type": "object"
       },
+      "ConfigOut": {
+        "properties": {
+          "document_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Document Types",
+            "type": "array"
+          },
+          "max_chars": {
+            "description": "Characters per request for this visitor",
+            "title": "Max Chars",
+            "type": "integer"
+          },
+          "max_upload_mb": {
+            "title": "Max Upload Mb",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "max_chars",
+          "max_upload_mb",
+          "document_types"
+        ],
+        "title": "ConfigOut",
+        "type": "object"
+      },
       "ErrorBody": {
         "properties": {
           "code": {
@@ -450,6 +477,28 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/v1/config": {
+      "get": {
+        "description": "Limits the web app shows to the visitor (accounts add their own limits in M5).",
+        "operationId": "config_v1_config_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Config",
+        "tags": [
+          "meta"
+        ]
+      }
+    },
     "/v1/files/extract": {
       "post": {
         "description": "Text from a .txt, .md, .docx or .pdf file (up to 5 MB). PDF text comes back cleaned.",

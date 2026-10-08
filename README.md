@@ -2,7 +2,7 @@
 
 Natural-sounding text-to-speech in the browser, powered by the open [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) model. Paste text or open a document, pick a voice, and hear it within seconds.
 
-> **Status:** early development. M0–M3 are done: project setup, speech engine, workers and the API. Next is M4 (web frontend). See the [development plan](docs/DEVELOPMENT_PLAN.md).
+> **Status:** early development. M0–M4 are done: setup, speech engine, workers, API and the web Studio. Next is M5 (accounts and limits). See the [development plan](docs/DEVELOPMENT_PLAN.md).
 
 ## Features (Stage 1)
 
@@ -114,12 +114,13 @@ curl -b cookies.txt http://localhost:8000/v1/tts/jobs/<id>      # status and, wh
 
 Live audio comes over the WebSocket at `stream_url` (JSON status messages plus binary PCM16 audio). After changing the API, run `python scripts/export_openapi.py` and `npm run api:types` in `web/` to update the frontend's types.
 
-**Web app:**
+**Web app** (with the Docker stack running):
 
 ```bash
 cd web
 npm install
 npm run dev                                    # http://localhost:5173 (proxies /v1 to :8000)
+npm run e2e                                    # browser tests (Playwright; first: npx playwright install chromium)
 ```
 
 **Checks** (the same ones CI runs):

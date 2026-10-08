@@ -40,6 +40,11 @@ def cache_key(body: JobCreate) -> str:
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
+async def _download_url(svc: Services, job_id: str, key: str) -> str:
+    """Signed link that plays in the browser and saves as a named file when downloaded."""
+    return await asyncio.to_thread(svc.storage.signed_url, key, f"kokoro-{job_id}.mp3")
+
+
 async def _record(svc: Services, job_id: str, caller: Caller) -> dict[str, str]:
     """The job's record, or 404 if it doesn't exist or belongs to someone else."""
     raw = await svc.redis.hgetall(events.record_key(job_id))
@@ -64,7 +69,7 @@ async def _job_out(svc: Services, job_id: str, record: dict[str, str]) -> JobOut
     if out.status == "queued":
         out.queue_position = await svc.queue.position(record["queue"], job_id)
     if out.status == "done" and "key" in record:
-        out.url = await asyncio.to_thread(svc.storage.signed_url, record["key"])
+        out.url = await _download_url(svc, job_id, record["key"])
     return out
 
 
@@ -210,9 +215,7 @@ async def stream_job(websocket: WebSocket, job_id: str) -> None:
                 continue
             if body["type"] == "done":
                 record = await _record(svc, job_id, caller)
-                body = body | {
-                    "url": await asyncio.to_thread(svc.storage.signed_url, record["key"])
-                }
+                body = body | {"url": await _download_url(svc, job_id, record["key"])}
             await websocket.send_json(body)
         await websocket.close()
     except WebSocketDisconnect:

@@ -5,6 +5,7 @@
 > **Fonts:** Inter (interface), JetBrains Mono (editor, times, numbers), from Google Fonts with system fallbacks
 > **Icons:** [Lucide](https://lucide.dev) line icons, 1.5 px stroke; no emoji in the interface
 > **Supported widths:** 360 px and up; no horizontal page scrolling at any width
+> **Built so far (M4):** everything below except the playback-speed menu, the shortcuts dialog and the account features (usage meter, pronunciations, history, sign-in, WAV download), which arrive with M5. The editor has no undo/redo buttons: Ctrl+Z works while typing, and Clean text / Open file offer Undo in their toast.
 
 ---
 
@@ -286,7 +287,7 @@ All dialogs are centred on wide screens and full-height sheets on narrow screens
 
 ## 11. Toasts and messages
 
-Toasts appear at the bottom centre, above the player bar, stack up to three, and close by themselves after 5 s (errors stay until dismissed). Each has an icon, a message and an optional action.
+Toasts appear at the top centre, just under the top bar (at the bottom they covered the Generate button), stack up to three, and close by themselves after 5 s (errors stay until dismissed). Each has an icon, a message and an optional action.
 
 | Kind | Icon / colour | Example |
 |---|---|---|

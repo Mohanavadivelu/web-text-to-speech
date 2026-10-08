@@ -25,5 +25,10 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - Anonymous visitors get an HMAC-signed cookie; jobs are visible only to their owner. Limits: text length, active jobs per visitor, requests per minute per IP and queue length.
 - OpenAPI schema exported to `web/src/api/openapi.json` with generated TypeScript types; CI fails if either is out of date.
 
+- Web Studio (M4): text editor with counts, limit meter, file open (button or drag and drop) and Clean text with Undo; voice settings with previews, mixing, speed and pitch; a streaming player that starts within ~1.5 s, buffers without gaps and seeks within what has arrived; a live waveform; download; toasts; dark and light themes; layouts for desktop, tablet (drawer) and phone (bottom sheet); keyboard shortcuts and screen-reader announcements.
+- Voice preview clips for all 37 voices, served as static files (`scripts/make_voice_previews.py`).
+- `GET /v1/config` (the visitor's limits) and download links that save as `kokoro-<job>.mp3`.
+- Browser tests (Playwright) for desktop and phone, run in CI against the Docker stack, plus unit tests for the streaming player.
+
 ### Security
 - The API refuses to start in production with the development cookie secret, and only trusts `CF-Connecting-IP` when configured to (it's spoofable without Cloudflare in front).

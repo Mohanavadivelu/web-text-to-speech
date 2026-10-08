@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
 from server.api.deps import Services, services
-from server.api.schemas import HealthOut, LanguageOut, VoiceOut, VoicesResponse
+from server.api.schemas import ConfigOut, HealthOut, LanguageOut, VoiceOut, VoicesResponse
 from server.engine import voices
+from server.engine.text import DOCUMENT_TYPES
 from server.events import WORKER_HEARTBEAT_PREFIX
 
 router = APIRouter(prefix="/v1", tags=["meta"])
@@ -48,3 +49,14 @@ _VOICES = VoicesResponse(
 async def list_voices() -> VoicesResponse:
     """Languages and their voices (the first voice is the default), plus speed and pitch ranges."""
     return _VOICES
+
+
+@router.get("/config", response_model=ConfigOut)
+async def config(svc: Services = Depends(services)) -> ConfigOut:
+    """Limits the web app shows to the visitor (accounts add their own limits in M5)."""
+    settings = svc.settings
+    return ConfigOut(
+        max_chars=settings.anon_max_chars,
+        max_upload_mb=settings.max_upload_bytes // 2**20,
+        document_types=list(DOCUMENT_TYPES),
+    )

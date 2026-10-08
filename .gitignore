@@ -21,6 +21,7 @@ models/
 *.wav
 *.mp3
 !server/tests/reference/*.wav
+!web/public/previews/*.mp3
 
 # Node / frontend
 node_modules/

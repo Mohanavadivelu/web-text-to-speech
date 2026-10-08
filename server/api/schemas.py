@@ -100,6 +100,12 @@ class ExtractOut(BaseModel):
     characters: int
 
 
+class ConfigOut(BaseModel):
+    max_chars: int = Field(description="Characters per request for this visitor")
+    max_upload_mb: int
+    document_types: list[str]
+
+
 class HealthOut(BaseModel):
     status: Literal["ok", "degraded"]
     redis: Literal["ok", "down"]

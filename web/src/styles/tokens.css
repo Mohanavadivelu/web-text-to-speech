@@ -1,0 +1,134 @@
+/* Design tokens from docs/DESIGN.md §1–4. Components use only these variables. */
+
+:root {
+  /* Colour: Studio Dark (default) */
+  --bg: #0f0f13;
+  --surface: #1a1a24;
+  --surface-2: #22222f;
+  --surface-3: #2a2a3a;
+  --chrome: #13131e;
+  --border: #2e2e42;
+  --border-strong: #3a3a52;
+  --accent: #7c5cbf;
+  --accent-hover: #9370db;
+  --accent-soft: rgb(124 92 191 / 0.18);
+  --on-accent: #ffffff;
+  --play: #1db97a;
+  --play-hover: #22d68e;
+  --download: #3b8eea;
+  --danger: #e05252;
+  --text: #e8e8f0;
+  --text-2: #9898b8;
+  --text-3: #6c6c8c;
+  --status-ok: #4ade80;
+  --status-busy: #f59e0b;
+  --status-error: #f87171;
+  --wave-played: #60a5fa;
+  --wave-unplayed: #1e3a8a;
+  --wave-pending: #2a2a3a;
+  --shadow-pop: 0 8px 24px rgb(0 0 0 / 0.35);
+  color-scheme: dark;
+
+  /* Type */
+  --font-ui: Inter, 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', Consolas, ui-monospace, monospace;
+  --type-title: 600 16px/24px var(--font-ui);
+  --type-label: 600 13px/20px var(--font-ui);
+  --type-body: 400 14px/22px var(--font-ui);
+  --type-small: 400 12px/18px var(--font-ui);
+  --type-value: 700 22px/28px var(--font-mono);
+
+  /* Spacing, radius */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 48px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+  --gutter: 16px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+}
+
+@media (min-width: 768px) {
+  :root {
+    --gutter: 24px;
+  }
+}
+
+/* Light theme: follows the system unless the visitor picked dark */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg: #f7f7fb;
+    --surface: #ffffff;
+    --surface-2: #f1f1f7;
+    --surface-3: #e7e7f0;
+    --chrome: #fbfbfe;
+    --border: #dcdce8;
+    --border-strong: #c4c4d6;
+    --accent: #6a48b0;
+    --accent-hover: #5a3b9c;
+    --accent-soft: rgb(106 72 176 / 0.1);
+    --play: #14935f;
+    --play-hover: #107a4f;
+    --download: #1f6fd1;
+    --danger: #c93a3a;
+    --text: #1b1b26;
+    --text-2: #55556e;
+    --text-3: #7a7a92;
+    --status-ok: #16a34a;
+    --status-busy: #b45309;
+    --status-error: #dc2626;
+    --wave-played: #2563eb;
+    --wave-unplayed: #bfd3f5;
+    --wave-pending: #e7e7f0;
+    --shadow-pop: 0 8px 24px rgb(20 20 40 / 0.12);
+    color-scheme: light;
+  }
+}
+
+:root[data-theme='light'] {
+  --bg: #f7f7fb;
+  --surface: #ffffff;
+  --surface-2: #f1f1f7;
+  --surface-3: #e7e7f0;
+  --chrome: #fbfbfe;
+  --border: #dcdce8;
+  --border-strong: #c4c4d6;
+  --accent: #6a48b0;
+  --accent-hover: #5a3b9c;
+  --accent-soft: rgb(106 72 176 / 0.1);
+  --play: #14935f;
+  --play-hover: #107a4f;
+  --download: #1f6fd1;
+  --danger: #c93a3a;
+  --text: #1b1b26;
+  --text-2: #55556e;
+  --text-3: #7a7a92;
+  --status-ok: #16a34a;
+  --status-busy: #b45309;
+  --status-error: #dc2626;
+  --wave-played: #2563eb;
+  --wave-unplayed: #bfd3f5;
+  --wave-pending: #e7e7f0;
+  --shadow-pop: 0 8px 24px rgb(20 20 40 / 0.12);
+  color-scheme: light;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 0ms;
+    --dur-base: 0ms;
+    --dur-slow: 0ms;
+  }
+}

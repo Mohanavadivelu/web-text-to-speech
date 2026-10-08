@@ -86,6 +86,14 @@ def test_voices(client):
     assert body["speed"] == [0.5, 2.0]
 
 
+def test_config_tells_the_web_app_its_limits(client):
+    assert client.get("/v1/config").json() == {
+        "max_chars": 2000,
+        "max_upload_mb": 5,
+        "document_types": [".txt", ".md", ".docx", ".pdf"],
+    }
+
+
 def test_responses_carry_a_request_id(client):
     assert client.get("/v1/voices").headers["X-Request-ID"]
     assert (

@@ -1,0 +1,283 @@
+// The Studio: type or open text, pick a voice, hear it while it's being made.
+
+import { AudioLines, ChevronDown } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+import { api, ApiError, type Config, type Language } from '../api/client'
+import { useSpeechJob, type SpeechJob } from '../audio/useSpeechJob'
+import { PlayerBar } from '../components/PlayerBar'
+import { Sheet } from '../components/Sheet'
+import { TextEditor, type TextEditorHandle } from '../components/TextEditor'
+import { VoicePanel } from '../components/VoicePanel'
+import { errorToast } from '../lib/errors'
+import { reconcile, useVoiceSettings } from '../lib/settings'
+import { useAppStatus } from '../lib/status'
+import { load, save } from '../lib/storage'
+import { useToast } from '../lib/toast'
+import { formatDuration, formatCount } from '../lib/text'
+import { useMediaQuery } from '../lib/useMediaQuery'
+import styles from './Studio.module.css'
+
+const DRAFT_KEY = 'kokoro.draft'
+const ZOOM_KEY = 'kokoro.zoom'
+const FALLBACK_CONFIG: Config = {
+  max_chars: 2000,
+  max_upload_mb: 5,
+  document_types: ['.txt', '.md', '.docx', '.pdf'],
+}
+
+export function Studio() {
+  const toast = useToast()
+  const { setStatus } = useAppStatus()
+  const wide = useMediaQuery('(min-width: 1024px)')
+  const editor = useRef<TextEditorHandle>(null)
+
+  const [languages, setLanguages] = useState<Language[]>([])
+  const [config, setConfig] = useState<Config>(FALLBACK_CONFIG)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [settings, setSettings] = useVoiceSettings()
+  const [text, setText] = useState(() => load(DRAFT_KEY, ''))
+  const [zoom, setZoom] = useState(() => load(ZOOM_KEY, 1))
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const [announcement, setAnnouncement] = useState('')
+
+  const onFinished = useCallback(
+    (job: SpeechJob) => {
+      if (job.status === 'ready') {
+        const seconds = job.player?.duration || job.job?.audio_seconds || 0
+        toast({
+          kind: 'success',
+          message: `Audio ready${seconds ? `: ${formatDuration(seconds)}` : ''}.`,
+        })
+        setAnnouncement('Audio ready.')
+      } else if (job.status === 'cancelled') {
+        toast({ kind: 'info', message: 'Stopped.' })
+        setAnnouncement('Generation stopped.')
+      } else if (job.status === 'error' && job.error) {
+        toast(errorToast(job.error))
+        setAnnouncement(job.error.message)
+      }
+    },
+    [toast],
+  )
+  const speech = useSpeechJob(onFinished)
+  const busy = speech.status === 'queued' || speech.status === 'streaming'
+
+  // Voices and limits
+  useEffect(() => {
+    let alive = true
+    Promise.all([api.voices(), api.config()])
+      .then(([voices, cfg]) => {
+        if (!alive) return
+        setLanguages(voices.languages)
+        setConfig(cfg)
+        setSettings((s) => reconcile(s, voices.languages))
+      })
+      .catch(
+        (err: unknown) =>
+          alive && setLoadError(err instanceof ApiError ? err.message : String(err)),
+      )
+    return () => {
+      alive = false
+    }
+  }, [setSettings])
+
+  // Draft and zoom are remembered (draft saved shortly after typing stops)
+  useEffect(() => {
+    const timer = window.setTimeout(() => save(DRAFT_KEY, text), 500)
+    return () => window.clearTimeout(timer)
+  }, [text])
+  useEffect(() => save(ZOOM_KEY, zoom), [zoom])
+
+  // Status dot, screen-reader announcements and the leave-page warning
+  useEffect(() => {
+    if (speech.status === 'queued') {
+      setStatus({
+        level: 'busy',
+        text: speech.queuePosition ? `Waiting · ${speech.queuePosition} ahead` : 'Starting…',
+      })
+    } else if (speech.status === 'streaming') {
+      setStatus({ level: 'busy', text: `Generating ${speech.progress}%` })
+    } else if (speech.status === 'error') {
+      setStatus({ level: 'error', text: 'Error' })
+    } else {
+      setStatus({ level: 'ok', text: 'Ready' })
+    }
+  }, [speech.status, speech.progress, speech.queuePosition, setStatus])
+
+  // Announce progress in quarters while streaming; other moments come from `announcement`
+  const quarter = Math.floor(speech.progress / 25) * 25
+  const liveMessage =
+    speech.status === 'streaming' && quarter > 0 && quarter < 100
+      ? `Generating, ${quarter}%`
+      : announcement
+
+  useEffect(() => {
+    if (!busy) return
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault()
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [busy])
+
+  const generate = useCallback(() => {
+    if (busy) return
+    const source = editor.current?.selection() ?? text
+    if (!source.trim()) return
+    if (source.length > config.max_chars) {
+      toast({
+        kind: 'error',
+        message: `This text is over the limit of ${formatCount(config.max_chars)} characters. Select a part to generate just that.`,
+      })
+      return
+    }
+    setAnnouncement('Generating speech…')
+    void speech.generate({
+      text: source,
+      lang: settings.lang,
+      voice: settings.voice,
+      speed: settings.speed,
+      pitch: settings.pitch,
+      blend_voice: settings.blendVoice,
+      blend_ratio: settings.blendRatio,
+      pronunciations: [],
+    })
+  }, [busy, text, config.max_chars, settings, speech, toast])
+
+  const replaceText = useCallback(
+    (next: string, message: string) => {
+      const previous = text
+      setText(next)
+      toast({ kind: 'info', message, action: { label: 'Undo', run: () => setText(previous) } })
+    },
+    [text, toast],
+  )
+
+  const openFile = useCallback(
+    async (file: File) => {
+      if (file.size > config.max_upload_mb * 2 ** 20) {
+        toast({ kind: 'error', message: `Files can be up to ${config.max_upload_mb} MB.` })
+        return
+      }
+      try {
+        const result = await api.extractFile(file)
+        replaceText(
+          result.text,
+          `Opened ${file.name}${result.cleaned ? ' (text cleaned)' : ''}: ${formatCount(result.characters)} characters.`,
+        )
+        if (result.characters > config.max_chars) {
+          toast({
+            kind: 'warning',
+            message: `That's over the ${formatCount(config.max_chars)}-character limit. Select a part to generate it.`,
+          })
+        }
+      } catch (err) {
+        if (err instanceof ApiError) toast(errorToast(err))
+      }
+    },
+    [config, replaceText, toast],
+  )
+
+  const clean = useCallback(async () => {
+    if (!text.trim()) return
+    try {
+      const result = await api.cleanText(text)
+      if (result.text === text) toast({ kind: 'info', message: 'The text was already clean.' })
+      else replaceText(result.text, 'Text cleaned.')
+    } catch (err) {
+      if (err instanceof ApiError) toast(errorToast(err))
+    }
+  }, [text, replaceText, toast])
+
+  // Keyboard shortcuts (DESIGN.md §14)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey
+      const inField = (e.target as HTMLElement).closest('textarea, input, select')
+      if (mod && e.key === 'Enter') {
+        e.preventDefault()
+        generate()
+      } else if (e.key === 'Escape' && busy && !sheetOpen) {
+        void speech.cancel()
+      } else if ((mod && e.code === 'Space') || (e.code === 'Space' && !inField && speech.player)) {
+        if (!speech.player) return
+        e.preventDefault()
+        const state = speech.player.state
+        if (state === 'playing' || state === 'buffering') speech.player.pause()
+        else speech.player.play()
+      } else if (mod && e.key.toLowerCase() === 'o') {
+        e.preventDefault()
+        editor.current?.openFilePicker()
+      } else if (mod && e.shiftKey && e.key.toLowerCase() === 'l') {
+        e.preventDefault()
+        void clean()
+      } else if (mod && e.key.toLowerCase() === 's' && speech.url) {
+        e.preventDefault()
+        window.location.assign(speech.url)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [generate, clean, busy, sheetOpen, speech])
+
+  const lang = languages.find((l) => l.code === settings.lang)
+  const voice = lang?.voices.find((v) => v.id === settings.voice)
+  const voiceSummary = voice ? `${voice.name} · ${lang?.name} · ${settings.speed}×` : 'Voice'
+
+  const panel = (
+    <VoicePanel languages={languages} settings={settings} onChange={setSettings} disabled={busy} />
+  )
+
+  return (
+    <div className={styles.studio}>
+      <div className={styles.main}>
+        {!wide && (
+          <button
+            className={styles.voiceChip}
+            onClick={() => setSheetOpen(true)}
+            aria-label={`Voice settings: ${voiceSummary}`}
+          >
+            <AudioLines size={16} />
+            <span>{voiceSummary}</span>
+            <ChevronDown size={16} />
+          </button>
+        )}
+        <TextEditor
+          ref={editor}
+          text={text}
+          onTextChange={setText}
+          lang={settings.lang}
+          speed={settings.speed}
+          maxChars={config.max_chars}
+          zoom={zoom}
+          onZoom={setZoom}
+          busy={busy}
+          progress={speech.progress}
+          queuePosition={speech.status === 'queued' ? speech.queuePosition : null}
+          onGenerate={generate}
+          onCancel={() => void speech.cancel()}
+          onOpenFile={(f) => void openFile(f)}
+          onClean={() => void clean()}
+          documentTypes={config.document_types}
+        />
+        {wide && (
+          <aside className={styles.side}>
+            {loadError ? <p className={styles.loadError}>{loadError}</p> : panel}
+          </aside>
+        )}
+      </div>
+      <PlayerBar
+        player={speech.player}
+        estimatedSeconds={speech.estimatedSeconds}
+        downloadUrl={speech.url}
+      />
+      {!wide && (
+        <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Voice settings">
+          {loadError ? <p className={styles.loadError}>{loadError}</p> : panel}
+        </Sheet>
+      )}
+      <div className="visually-hidden" aria-live="polite">
+        {liveMessage}
+      </div>
+    </div>
+  )
+}

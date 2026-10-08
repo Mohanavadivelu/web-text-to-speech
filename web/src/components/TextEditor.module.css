@@ -1,0 +1,226 @@
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+}
+
+.tool {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.tool:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.tool:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 var(--space-1);
+  background: var(--border);
+}
+
+.spacer {
+  flex: 1;
+}
+
+.editorWrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: var(--space-3);
+}
+
+.editor {
+  flex: 1;
+  min-height: 220px;
+  resize: none;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-mono);
+  line-height: 1.7;
+  color: var(--text);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.editor::placeholder {
+  color: var(--text-3);
+}
+
+.editor:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+
+.editor[readonly] {
+  color: var(--text-2);
+}
+
+.drop {
+  position: absolute;
+  inset: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font: var(--type-label);
+  color: var(--accent-hover);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  border: 2px dashed var(--accent);
+  border-radius: var(--radius-md);
+  pointer-events: none;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  padding: 0 var(--space-3) var(--space-3);
+}
+
+.counts {
+  font: var(--type-small);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.meter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--type-small);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.meterTrack {
+  width: 64px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.meterFill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.warn {
+  color: var(--status-busy);
+}
+.warn .meterFill {
+  background: var(--status-busy);
+}
+.error {
+  color: var(--status-error);
+}
+.error .meterFill {
+  background: var(--status-error);
+}
+
+.generate {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: 0 var(--space-5);
+  font: var(--type-label);
+  color: var(--on-accent);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  overflow: hidden;
+  transition: background var(--dur-fast) var(--ease);
+}
+
+.generate:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.generate:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.generate > :not(.progress) {
+  position: relative;
+}
+
+.cancel {
+  color: var(--danger);
+  background: transparent;
+  border: 1px solid var(--danger);
+}
+
+.cancel:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.progress {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  transition: width var(--dur-base) var(--ease);
+}
+
+.kbd {
+  font: 400 11px/16px var(--font-ui);
+  padding: 0 var(--space-1);
+  border-radius: 4px;
+  background: rgb(255 255 255 / 0.18);
+}
+
+@media (max-width: 767px) {
+  .panel {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  .tool {
+    width: 44px;
+    height: 44px;
+  }
+  .generate {
+    width: 100%;
+    justify-content: center;
+    height: 48px;
+  }
+  .kbd {
+    display: none;
+  }
+}

@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+  '/v1/config': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Config
+     * @description Limits the web app shows to the visitor (accounts add their own limits in M5).
+     */
+    get: operations['config_v1_config_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/v1/files/extract': {
     parameters: {
       query?: never
@@ -136,6 +156,18 @@ export interface components {
     Body_extract_v1_files_extract_post: {
       /** File */
       file: string
+    }
+    /** ConfigOut */
+    ConfigOut: {
+      /** Document Types */
+      document_types: string[]
+      /**
+       * Max Chars
+       * @description Characters per request for this visitor
+       */
+      max_chars: number
+      /** Max Upload Mb */
+      max_upload_mb: number
     }
     /** ErrorBody */
     ErrorBody: {
@@ -324,6 +356,26 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  config_v1_config_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ConfigOut']
+        }
+      }
+    }
+  }
   extract_v1_files_extract_post: {
     parameters: {
       query?: never

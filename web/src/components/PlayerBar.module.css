@@ -1,0 +1,131 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--gutter);
+  padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+  background: var(--surface-2);
+  border-top: 1px solid var(--border);
+}
+
+.play {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: none;
+  color: #fff;
+  background: var(--play);
+  cursor: pointer;
+}
+
+.play:hover:not(:disabled) {
+  background: var(--play-hover);
+}
+
+.play:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.time,
+.total {
+  flex: none;
+  font: 400 13px/20px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+  min-width: 3.5em;
+}
+
+.time {
+  color: var(--text);
+  text-align: right;
+}
+
+.volume {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.volume input {
+  width: 80px;
+  accent-color: var(--download);
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  color: var(--text-2);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.icon:hover {
+  color: var(--text);
+  background: var(--surface-3);
+}
+
+.download {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 36px;
+  padding: 0 var(--space-4);
+  font: var(--type-label);
+  color: var(--download);
+  text-decoration: none;
+  border: 1px solid color-mix(in srgb, var(--download) 40%, transparent);
+  border-radius: var(--radius-pill);
+}
+
+.download:hover {
+  background: color-mix(in srgb, var(--download) 12%, transparent);
+}
+
+.download[aria-disabled='true'] {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 767px) {
+  .bar {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .volume,
+  .total {
+    display: none;
+  }
+  .download span {
+    display: none;
+  }
+  .download {
+    padding: 0 var(--space-3);
+    height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}

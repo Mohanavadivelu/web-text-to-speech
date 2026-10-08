@@ -1,0 +1,97 @@
+.stack {
+  position: fixed;
+  left: 50%;
+  top: 68px; /* just under the top bar, so toasts never cover the editor's buttons */
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: min(480px, calc(100vw - 2 * var(--gutter)));
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  background: var(--surface-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop);
+  font: var(--type-body);
+  color: var(--text);
+  animation: rise var(--dur-base) var(--ease);
+}
+
+.icon {
+  flex: none;
+}
+
+.info .icon {
+  color: var(--text-2);
+}
+.success .icon {
+  color: var(--status-ok);
+}
+.warning .icon {
+  color: var(--status-busy);
+}
+.error {
+  border-color: var(--status-error);
+}
+.error .icon {
+  color: var(--status-error);
+}
+
+.message {
+  flex: 1;
+}
+
+.action {
+  flex: none;
+  font: var(--type-label);
+  color: var(--accent-hover);
+  background: none;
+  border: none;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--accent-soft);
+}
+
+.close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--text-3);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.close:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+}
+
+@media (max-width: 767px) {
+  .stack {
+    top: 60px;
+  }
+}

@@ -141,6 +141,12 @@ Builds `server/engine/` as described in §5 of the Stage 1 plan.
 | M4.9 | Open file (button and drag and drop) → `/files/extract`; Clean text button | 0.25 | PDF text arrives already cleaned |
 | M4.10 | Playwright end-to-end test: type → generate → hear audio → download | 0.25 | Runs in CI against the compose stack |
 
+**Result (M4 done):** the Studio works end to end in Chromium on desktop and phone layouts: type or open a document, pick and preview a voice, hear speech within ~1.5 s while the rest streams, cancel, download. 7 Playwright tests (run in CI against the Docker stack) and 14 unit tests (the streaming player with a fake audio clock, estimates, settings). The bundle is 83 KB gzipped. Differences from the design, recorded in `DESIGN.md`:
+- Toasts sit at the top: at the bottom they covered the Generate button.
+- Clean text and Open file offer **Undo** in their toast; the editor's own Ctrl+Z covers typing, so there are no separate undo/redo buttons yet.
+- Not yet built: the playback-speed menu (needs pitch-preserving playback), the shortcuts dialog (`?`), and the account items (usage meter, pronunciations, history, sign-in), which come with M5.
+- Bug caught by the browser tests: the "finished" callback ran inside a React state updater, which React may call twice, so every job showed two toasts. It now runs in an effect.
+
 ---
 
 ## M5: Accounts and limits
