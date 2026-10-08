@@ -48,7 +48,11 @@ def test_storage_endpoints_default_to_r2_and_can_be_overridden():
     assert dev.storage_public_endpoint == "http://localhost:8333"
 
 
-def test_production_refuses_the_development_cookie_secret():
+def test_production_refuses_development_secrets_and_a_missing_bot_check():
     with pytest.raises(ValueError, match="ANON_COOKIE_SECRET"):
-        Settings(_env_file=None, app_env="production")
-    Settings(_env_file=None, app_env="production", anon_cookie_secret="x" * 40)
+        Settings(_env_file=None, app_env="production", turnstile_secret_key="t")
+    with pytest.raises(ValueError, match="TURNSTILE_SECRET_KEY"):
+        Settings(_env_file=None, app_env="production", anon_cookie_secret="x" * 40)
+    Settings(
+        _env_file=None, app_env="production", anon_cookie_secret="x" * 40, turnstile_secret_key="t"
+    )

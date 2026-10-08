@@ -129,3 +129,129 @@
     height: 44px;
   }
 }
+
+.usage {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: var(--type-small);
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.usageTrack {
+  width: 48px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.usageFill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+.usage.busy {
+  color: var(--status-busy);
+}
+.usage.busy .usageFill {
+  background: var(--status-busy);
+}
+.usage.error {
+  color: var(--status-error);
+}
+.usage.error .usageFill {
+  background: var(--status-error);
+}
+
+.signIn {
+  font: var(--type-label);
+  color: var(--accent-hover);
+  text-decoration: none;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+  white-space: nowrap;
+}
+
+.signIn:hover {
+  background: var(--accent-soft);
+}
+
+.account {
+  position: relative;
+}
+
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  font: var(--type-label);
+  color: var(--on-accent);
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-2));
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-pop);
+}
+
+.menuEmail {
+  padding: var(--space-2) var(--space-3);
+  font: var(--type-small);
+  color: var(--text-3);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font: var(--type-body);
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.menu button:hover {
+  background: var(--surface-2);
+}
+
+@media (max-width: 1023px) {
+  .usageText {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .usage {
+    display: none;
+  }
+  .avatar {
+    width: 40px;
+    height: 40px;
+  }
+}

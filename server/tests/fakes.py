@@ -71,3 +71,64 @@ class FakeQueue:
 
     async def close(self):
         pass
+
+
+class FakeDatabase:
+    """In-memory stand-in for server.db.PostgresDatabase."""
+
+    def __init__(self):
+        self.jobs: dict[str, dict] = {}
+        self.pronunciations: dict[str, list[dict]] = {}
+        self.usage: dict[tuple, dict] = {}
+
+    async def insert_job(self, job):
+        import datetime as dt
+
+        self.jobs[job["id"]] = {"created_at": dt.datetime.now(dt.UTC), "wav_key": None} | job
+
+    def record_result(self, job_id, status, **fields):
+        """What the worker calls (server.db.record_result_sync)."""
+        self.jobs[job_id].update(status=status, **fields)
+
+    async def history(self, user_id, since):
+        rows = [
+            j for j in self.jobs.values()
+            if j.get("user_id") == user_id and j["status"] == "done" and j["created_at"] >= since
+        ]  # fmt: skip
+        return sorted(rows, key=lambda j: j["created_at"], reverse=True)
+
+    async def get_pronunciations(self, user_id):
+        return list(self.pronunciations.get(user_id, []))
+
+    async def put_pronunciations(self, user_id, entries):
+        self.pronunciations[user_id] = list(entries)
+
+    async def add_usage(self, subject, day, chars):
+        row = self.usage.setdefault((subject, day), {"chars": 0, "jobs": 0})
+        row["chars"] += chars
+        row["jobs"] += 1
+
+    async def close(self):
+        pass
+
+
+class FakeVerifier:
+    """Accepts tokens of the form "user:<uuid>[:email]"."""
+
+    async def verify(self, token):
+        from server.api.errors import APIError
+
+        if not token.startswith("user:"):
+            raise APIError("unauthorized", "Your session has expired. Please sign in again.")
+        _, sub, *email = token.split(":")
+        return {"sub": sub, "email": email[0] if email else None}
+
+
+class FakeBots:
+    def __init__(self, allow=True):
+        self.allow = allow
+        self.tokens = []
+
+    async def verify(self, token, ip):
+        self.tokens.append(token)
+        return self.allow and token == "human"

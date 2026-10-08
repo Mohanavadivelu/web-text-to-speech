@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import logging
 import secrets
 import time
 from dataclasses import asdict
@@ -13,7 +14,7 @@ from fastapi import APIRouter, Depends, Response, WebSocket, WebSocketDisconnect
 
 from server import events
 from server.api import limits
-from server.api.auth import Caller, caller_dependency, identify, set_cookie
+from server.api.auth import WS_PROTOCOL, Caller, caller_dependency, identify, set_cookie
 from server.api.deps import Services, services, ws_services
 from server.api.errors import APIError
 from server.api.schemas import ErrorResponse, JobCreate, JobOut
@@ -21,12 +22,14 @@ from server.engine import model_store, text
 from server.worker.jobs import JobRequest
 from server.worker.storage import audio_key
 
+log = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/tts", tags=["tts"])
 
 ERRORS = {
-    code: {"model": ErrorResponse} for code in (404, 413, 422, 429, 503)
+    code: {"model": ErrorResponse} for code in (401, 404, 413, 422, 429, 503)
 }  # documented in OpenAPI
 WS_NOT_FOUND = 4404
+WS_UNAUTHORIZED = 4401
 AUDIO_FRAME_BYTES = 48_000  # 1 s of 24 kHz 16-bit mono per WebSocket message
 
 
@@ -34,15 +37,43 @@ def new_job_id() -> str:
     return "j_" + secrets.token_hex(8)
 
 
-def cache_key(body: JobCreate) -> str:
-    """Same text and settings with the same model → same audio."""
-    payload = body.model_dump(mode="json") | {"model": model_store.REVISION}
+def cache_key(body: JobCreate, pronunciations: list[dict]) -> str:
+    """Same text and settings (and pronunciations) with the same model → same audio."""
+    payload = body.model_dump(mode="json", exclude={"turnstile_token", "pronunciations"}) | {
+        "pronunciations": pronunciations,
+        "model": model_store.REVISION,
+    }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
 async def _download_url(svc: Services, job_id: str, key: str) -> str:
     """Signed link that plays in the browser and saves as a named file when downloaded."""
-    return await asyncio.to_thread(svc.storage.signed_url, key, f"kokoro-{job_id}.mp3")
+    extension = key.rsplit(".", 1)[-1]
+    return await asyncio.to_thread(svc.storage.signed_url, key, f"kokoro-{job_id}.{extension}")
+
+
+async def _best_effort(what: str, coroutine) -> None:
+    """Job records and usage statistics shouldn't stop speech if the database is down."""
+    try:
+        await coroutine
+    except Exception:
+        log.exception("Could not save %s", what)
+
+
+def _job_row(job_id: str, caller: Caller, body: JobCreate, **extra) -> dict:
+    """The Postgres row for a job: settings and lengths, never the text."""
+    return {
+        "id": job_id,
+        "user_id": caller.id if caller.signed_in else None,
+        "anon_id": None if caller.signed_in else caller.id,
+        "lang": body.lang,
+        "voice": body.voice,
+        "blend_voice": body.blend_voice,
+        "blend_ratio": body.blend_ratio if body.blend_voice else None,
+        "speed": body.speed,
+        "pitch": body.pitch,
+        "chars": len(body.text),
+    } | extra
 
 
 async def _record(svc: Services, job_id: str, caller: Caller) -> dict[str, str]:
@@ -70,6 +101,8 @@ async def _job_out(svc: Services, job_id: str, record: dict[str, str]) -> JobOut
         out.queue_position = await svc.queue.position(record["queue"], job_id)
     if out.status == "done" and "key" in record:
         out.url = await _download_url(svc, job_id, record["key"])
+        if record.get("wav_key"):
+            out.wav_url = await _download_url(svc, job_id, record["wav_key"])
     return out
 
 
@@ -120,19 +153,37 @@ async def create_job(
     caller: Caller = Depends(caller_dependency),
     svc: Services = Depends(services),
 ) -> JobOut:
-    """Queue text for speech. Follow it live on `stream_url`, or poll the job."""
+    """Queue text for speech. Follow it live on `stream_url`, or poll the job.
+
+    Anonymous visitors must include a Cloudflare Turnstile token. Signed-in users'
+    saved pronunciations are applied unless the request brings its own.
+    """
     settings = svc.settings
-    await limits.check_rate(svc.redis, settings, caller.ip)
-    await limits.check_text_length(settings, body.text)
-    await limits.check_active_jobs(svc.redis, settings, caller)
+    lim = limits.limits_for(caller, settings)
+    await limits.check_rate(svc.redis, caller, lim)
+    if not caller.signed_in and not await svc.bots.verify(body.turnstile_token, caller.ip):
+        raise APIError("unauthorized", "Please confirm you're not a robot, then try again.")
+    limits.check_text_length(lim, body.text, caller)
+    await limits.check_active_jobs(svc.redis, caller, lim)
     set_cookie(response, caller, secure=settings.app_env == "production")
 
+    pronunciations = [p.model_dump() for p in body.pronunciations]
+    if caller.signed_in and not pronunciations:
+        pronunciations = await svc.db.get_pronunciations(caller.id)
+
     job_id = new_job_id()
-    key = cache_key(body)
-    cached = await _reuse_cached(svc, body, caller, job_id, key)
+    key = cache_key(body, pronunciations)
+    # Signed-in users also get a WAV, which the cache doesn't keep: they always generate
+    cached = None if lim.wav else await _reuse_cached(svc, body, caller, job_id, key)
     if cached:
+        row = _job_row(
+            job_id, caller, body, status="done", cached=True, storage_key=cached["key"],
+            audio_seconds=float(cached["audio_seconds"]),
+        )  # fmt: skip
+        await _best_effort("job", svc.db.insert_job(row))
         return await _job_out(svc, job_id, cached)
 
+    await limits.check_daily_quota(svc.redis, caller, lim, len(body.text))
     queue = (
         settings.queue_short if len(body.text) <= settings.short_job_chars else settings.queue_long
     )
@@ -157,13 +208,17 @@ async def create_job(
         pitch=body.pitch,
         blend_voice=body.blend_voice,
         blend_ratio=body.blend_ratio,
-        pronunciations=[p.model_dump() for p in body.pronunciations],
+        pronunciations=pronunciations,
         owner_kind=caller.kind,
         owner_id=caller.id,
-        cache_key=key,
+        wav=lim.wav,
+        cache_key=None if lim.wav else key,
     )
+    await _best_effort("job", svc.db.insert_job(_job_row(job_id, caller, body, status="queued")))
     await svc.queue.enqueue(job_id, asdict(request), queue)
     await limits.remember_active_job(svc.redis, settings, caller, job_id)
+    await limits.count_usage(svc.redis, caller, len(body.text))
+    await _best_effort("usage", svc.db.add_usage(caller.owner, limits.today(), len(body.text)))
     return await _job_out(svc, job_id, {k: str(v) for k, v in record.items()})
 
 
@@ -195,16 +250,19 @@ async def stream_job(websocket: WebSocket, job_id: str) -> None:
     Connecting late (or again) replays everything from the start.
     """
     svc = ws_services(websocket)
-    caller = identify(websocket, svc.settings, create=False)
     try:
+        caller = await identify(websocket, svc.settings, svc.verifier, create=False)
         if caller is None:
             raise APIError("not_found", "")
         await _record(svc, job_id, caller)
-    except APIError:
-        await websocket.close(code=WS_NOT_FOUND)
+    except APIError as exc:
+        code = WS_UNAUTHORIZED if exc.code == "unauthorized" else WS_NOT_FOUND
+        await websocket.close(code=code)
         return
 
-    await websocket.accept()
+    # Browsers that send their token as a subprotocol expect one subprotocol back
+    offered = websocket.scope.get("subprotocols", [])
+    await websocket.accept(subprotocol=WS_PROTOCOL if WS_PROTOCOL in offered else None)
     try:
         async for kind, body in events.follow(svc.redis, job_id):
             if kind == "audio":
@@ -216,6 +274,8 @@ async def stream_job(websocket: WebSocket, job_id: str) -> None:
             if body["type"] == "done":
                 record = await _record(svc, job_id, caller)
                 body = body | {"url": await _download_url(svc, job_id, record["key"])}
+                if record.get("wav_key"):
+                    body["wav_url"] = await _download_url(svc, job_id, record["wav_key"])
             await websocket.send_json(body)
         await websocket.close()
     except WebSocketDisconnect:

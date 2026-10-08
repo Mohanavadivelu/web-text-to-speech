@@ -13,8 +13,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from server.api import errors, routes_meta, routes_text, routes_tts
-from server.api.deps import ArqJobQueue, Services
+from server.api import errors, routes_me, routes_meta, routes_text, routes_tts
+from server.api.auth import TokenVerifier
+from server.api.deps import ArqJobQueue, Services, Turnstile
 from server.config import Settings, get_settings
 
 log = logging.getLogger("server.api")
@@ -38,6 +39,7 @@ async def _real_services(settings: Settings) -> Services:
     from arq import create_pool
     from arq.connections import RedisSettings
 
+    from server.db import PostgresDatabase
     from server.worker.storage import Storage
 
     return Services(
@@ -45,6 +47,9 @@ async def _real_services(settings: Settings) -> Services:
         redis=aioredis.from_url(settings.redis_url),
         queue=ArqJobQueue(await create_pool(RedisSettings.from_dsn(settings.redis_url))),
         storage=Storage(settings),
+        db=await PostgresDatabase.connect(settings.database_url),
+        verifier=TokenVerifier(settings),
+        bots=Turnstile(settings.turnstile_secret_key),
     )
 
 
@@ -64,6 +69,7 @@ def create_app(services: Services | None = None) -> FastAPI:
         if own:
             await app.state.services.queue.close()
             await app.state.services.redis.aclose()
+            await app.state.services.db.close()
 
     app = FastAPI(
         title="Kokoro TTS Web API",
@@ -78,7 +84,7 @@ def create_app(services: Services | None = None) -> FastAPI:
         allow_origins=[o.strip() for o in settings.public_web_origin.split(",") if o.strip()],
         allow_credentials=True,
         allow_methods=["GET", "POST", "DELETE"],
-        allow_headers=["Content-Type"],
+        allow_headers=["Content-Type", "Authorization"],
         expose_headers=["X-Request-ID", "Retry-After"],
     )
 
@@ -96,7 +102,7 @@ def create_app(services: Services | None = None) -> FastAPI:
         )  # fmt: skip
         return response
 
-    for module in (routes_meta, routes_tts, routes_text):
+    for module in (routes_meta, routes_tts, routes_text, routes_me):
         app.include_router(module.router)
     return app
 

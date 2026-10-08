@@ -20,6 +20,7 @@ from arq.connections import RedisSettings
 
 from server import events
 from server.config import get_settings
+from server.db import record_result_sync
 from server.engine.synth import KokoroEngine
 from server.worker.jobs import JobRequest, run_job
 from server.worker.storage import Storage
@@ -42,6 +43,7 @@ async def synthesize(ctx: dict, job_id: str, request: dict) -> dict:
         storage=ctx["storage"],
         redis=ctx["redis_sync"],
         settings=ctx["settings"],
+        on_finish=ctx["record_result"],
     )
 
 
@@ -72,6 +74,9 @@ async def startup(ctx: dict) -> None:
     ctx["settings"] = settings
     ctx["redis_sync"] = redis_sync.Redis.from_url(settings.redis_url)
     ctx["storage"] = Storage(settings)
+    ctx["record_result"] = (
+        record_result_sync(settings.database_url) if settings.database_url else None
+    )
     if settings.r2_endpoint_url:  # development store: create the bucket if needed
         await _ensure_bucket(ctx["storage"])
     engine = KokoroEngine(threads=settings.engine_threads)

@@ -22,10 +22,22 @@ class Settings(BaseSettings):
     sentry_dsn: str = ""
     trust_cloudflare_ip_header: bool = False  # only behind Cloudflare (M6); otherwise spoofable
 
-    # Limits (anonymous users; signed-in limits arrive with accounts in M5)
+    # Accounts (Supabase)
+    supabase_url: str = ""
+    supabase_jwt_issuer: str = ""  # defaults to <supabase_url>/auth/v1
+    database_url: str = ""
+    turnstile_secret_key: str = ""  # empty = no bot check (development only)
+
+    # Limits per tier (Stage 1 plan §10)
     anon_max_chars: int = 2000
-    max_active_jobs: int = 2  # running + queued, per user
-    rate_limit_per_minute: int = 10  # job and file requests, per IP
+    user_max_chars: int = 20_000
+    anon_daily_chars: int = 10_000
+    user_daily_chars: int = 100_000
+    max_active_jobs: int = 2  # anonymous: running + queued
+    user_max_active_jobs: int = 3
+    rate_limit_per_minute: int = 10  # anonymous: job and file requests per IP
+    user_rate_limit_per_minute: int = 30
+    history_days: int = 7
     max_queued_jobs: int = 30  # per queue; above this new jobs get "busy"
     max_upload_bytes: int = 5 * 1024 * 1024
     extract_timeout_seconds: int = 20
@@ -58,9 +70,18 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _no_dev_secrets_in_production(self) -> Settings:
-        if self.app_env == "production" and self.anon_cookie_secret == DEV_COOKIE_SECRET:
-            raise ValueError("ANON_COOKIE_SECRET must be set to a long random value in production.")
+        if self.app_env == "production":
+            if self.anon_cookie_secret == DEV_COOKIE_SECRET:
+                raise ValueError(
+                    "ANON_COOKIE_SECRET must be set to a long random value in production."
+                )
+            if not self.turnstile_secret_key:
+                raise ValueError("TURNSTILE_SECRET_KEY is required in production.")
         return self
+
+    @property
+    def jwt_issuer(self) -> str:
+        return self.supabase_jwt_issuer or f"{self.supabase_url}/auth/v1"
 
     @property
     def storage_endpoint(self) -> str:

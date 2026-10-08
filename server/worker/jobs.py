@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from server import events
@@ -77,7 +78,14 @@ def job_timeout(request: JobRequest, engine, settings: Settings) -> float:
 
 
 def run_job(
-    job_id: str, request: JobRequest, *, engine, storage, redis, settings: Settings
+    job_id: str,
+    request: JobRequest,
+    *,
+    engine,
+    storage,
+    redis,
+    settings: Settings,
+    on_finish: Callable[..., None] | None = None,
 ) -> dict:
     """Run a job to completion and return its final event."""
     record = events.record_key(job_id)
@@ -98,7 +106,7 @@ def run_job(
             redis.hset(record, "progress", percent)
             publisher.event(type="progress", percent=percent)
 
-    def finish(status: str, *, message=None, key=None, duration=None) -> dict:
+    def finish(status: str, *, message=None, key=None, wav_key=None, duration=None) -> dict:
         """Store the final status and publish the matching final event (type == status)."""
         fields = {"status": status}
         final = {"type": status}
@@ -106,9 +114,19 @@ def run_job(
             fields["error"] = final["message"] = message
         if key:
             fields["key"] = key
+        if wav_key:
+            fields["wav_key"] = wav_key
         if duration is not None:
             fields["audio_seconds"] = final["duration"] = duration
         redis.hset(record, mapping=fields)
+        if on_finish is not None:
+            try:  # the Postgres job record (history); speech must not fail because of it
+                on_finish(
+                    job_id, status, audio_seconds=duration, storage_key=key,
+                    wav_key=wav_key, error=message,
+                )  # fmt: skip
+            except Exception:
+                log.exception("Job %s: could not record the result", job_id)
         publisher.event(**final)
         return final
 
@@ -145,10 +163,12 @@ def run_job(
 
     duration = round(len(result) / SAMPLE_RATE, 2)
     key = audio_key(request.owner_kind, request.owner_id, job_id, "mp3")
+    wav_key = (
+        audio_key(request.owner_kind, request.owner_id, job_id, "wav") if request.wav else None
+    )
     try:
         storage.put(key, audio.encode_mp3(result), CONTENT_TYPES["mp3"])
-        if request.wav:
-            wav_key = audio_key(request.owner_kind, request.owner_id, job_id, "wav")
+        if wav_key:
             storage.put(wav_key, audio.encode_wav(result), CONTENT_TYPES["wav"])
     except Exception:
         log.exception("Job %s: saving the audio failed", job_id)
@@ -165,4 +185,4 @@ def run_job(
             f"{key}|{duration}",
             ex=settings.cache_ttl_seconds,
         )
-    return finish("done", key=key, duration=duration)
+    return finish("done", key=key, wav_key=wav_key, duration=duration)

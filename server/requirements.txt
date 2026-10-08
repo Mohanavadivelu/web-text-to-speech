@@ -13,6 +13,12 @@ arq==0.28.0
 redis==5.3.1
 boto3==1.43.109
 
+# ── Accounts (Supabase Postgres and sign-in tokens) ──────────────────────────
+psycopg[binary]==3.3.6
+psycopg-pool==3.3.3
+PyJWT[crypto]==2.15.1
+cryptography==50.0.2
+
 # ── Speech engine (server/engine) ────────────────────────────────────────────
 numpy==2.4.6
 onnxruntime==1.30.0

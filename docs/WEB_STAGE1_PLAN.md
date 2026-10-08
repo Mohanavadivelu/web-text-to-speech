@@ -390,7 +390,7 @@ pronunciations  (user_id uuid, word text, say text, primary key (user_id, word))
 usage_daily     (subject text, day date, chars int, jobs int, primary key (subject, day))
 ```
 
-The `jobs` table does not store the input text (see [§14](#14-security-and-privacy)). Row-level security makes each user able to read only their own rows. The API writes with the secret key (`sb_secret_…`), which is never sent to the browser.
+The `jobs` table does not store the input text (see [§14](#14-security-and-privacy)). Row-level security makes each user able to read only their own rows. The API and workers write through a direct database connection (`DATABASE_URL`), which bypasses row-level security and is never exposed to the browser; RLS protects the tables if a browser ever talks to Supabase directly.
 
 ---
 

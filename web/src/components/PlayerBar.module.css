@@ -96,6 +96,19 @@
   pointer-events: none;
 }
 
+.wav {
+  flex: none;
+  font: var(--type-label);
+  color: var(--download);
+  text-decoration: none;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+}
+
+.wav:hover {
+  background: color-mix(in srgb, var(--download) 12%, transparent);
+}
+
 .spin {
   animation: spin 1s linear infinite;
 }

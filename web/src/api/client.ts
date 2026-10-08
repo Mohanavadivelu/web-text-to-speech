@@ -12,6 +12,15 @@ export type Voice = Schemas['VoiceOut']
 export type Config = Schemas['ConfigOut']
 export type Extracted = Schemas['ExtractOut']
 export type ErrorCode = Schemas['ErrorBody']['code']
+export type Me = Schemas['MeOut']
+export type HistoryItem = Schemas['HistoryItem']
+export type Pronunciation = Schemas['Pronunciation']
+
+// The signed-in user's access token (set by AuthProvider); null = anonymous visitor.
+let accessToken: string | null = null
+export function setAccessToken(token: string | null): void {
+  accessToken = token
+}
 
 /** An API error with the server's code and a message that's safe to show. */
 export class ApiError extends Error {
@@ -27,8 +36,10 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response
+  const headers = new Headers(init?.headers)
+  if (accessToken) headers.set('Authorization', `Bearer ${accessToken}`)
   try {
-    response = await fetch(path, { credentials: 'include', ...init })
+    response = await fetch(path, { credentials: 'include', ...init, headers })
   } catch {
     throw new ApiError('network', "Can't reach the server. Check your connection and try again.")
   }
@@ -58,6 +69,14 @@ export const api = {
   cancelJob: (id: string) =>
     request<Job>(`/v1/tts/jobs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   cleanText: (text: string) => request<{ text: string }>('/v1/text/clean', json({ text })),
+  me: () => request<Me>('/v1/me'),
+  history: () => request<Schemas['HistoryOut']>('/v1/me/history'),
+  pronunciations: () => request<Schemas['PronunciationsBody']>('/v1/me/pronunciations'),
+  savePronunciations: (entries: Pronunciation[]) =>
+    request<Schemas['PronunciationsBody']>('/v1/me/pronunciations', {
+      ...json({ entries }),
+      method: 'PUT',
+    }),
   extractFile: (file: File) => {
     const form = new FormData()
     form.append('file', file)
@@ -65,8 +84,10 @@ export const api = {
   },
 }
 
-/** WebSocket URL for a job's stream_url, on the same host as the page. */
-export function streamUrl(path: string): string {
+/** Open a job's stream. Browsers can't set headers on WebSockets, so a signed-in
+ * user's token travels as a subprotocol (never in the URL, which would be logged). */
+export function openStream(path: string): WebSocket {
   const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-  return `${scheme}//${window.location.host}${path}`
+  const url = `${scheme}//${window.location.host}${path}`
+  return accessToken ? new WebSocket(url, ['kokoro', `auth.${accessToken}`]) : new WebSocket(url)
 }

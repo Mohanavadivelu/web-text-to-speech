@@ -63,7 +63,7 @@ We won't take legal action against research that follows these guidelines in goo
 - **Short-lived audio:** generated audio is deleted automatically: after 1 day for anonymous use and 7 days for signed-in users. Download links are signed and expire after 1 hour.
 - **Private storage:** audio files are not publicly listable; each one can only be reached through its signed link.
 - **Uploaded documents** are checked by content type and size, parsed in an isolated worker with a time and memory limit, and deleted right after the text is extracted.
-- **Authentication** uses Supabase (email link or Google); the API verifies every token. Each user can only read their own data (Postgres row-level security).
+- **Authentication** uses Supabase (email link; Google later). The API verifies every token against Supabase's public signing keys, refuses invalid ones, and never accepts tokens in URLs. Each user can only read their own data (Postgres row-level security, covered by automated tests).
 - **Abuse protection:** per-user and per-IP rate limits, daily quotas, Cloudflare Turnstile for anonymous use, and Cloudflare WAF rules.
 - **Transport:** HTTPS only, with HSTS and a restrictive Content Security Policy.
 - **Infrastructure:** the server only accepts web traffic from Cloudflare, SSH uses keys only, and security updates install automatically.

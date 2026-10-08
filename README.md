@@ -2,7 +2,7 @@
 
 Natural-sounding text-to-speech in the browser, powered by the open [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) model. Paste text or open a document, pick a voice, and hear it within seconds.
 
-> **Status:** early development. M0–M4 are done: setup, speech engine, workers, API and the web Studio. Next is M5 (accounts and limits). See the [development plan](docs/DEVELOPMENT_PLAN.md).
+> **Status:** early development. M0–M5 are done: setup, speech engine, workers, API, web Studio and accounts. Next is M6 (production deployment). See the [development plan](docs/DEVELOPMENT_PLAN.md).
 
 ## Features (Stage 1)
 
@@ -123,6 +123,12 @@ npm run dev                                    # http://localhost:5173 (proxies 
 npm run e2e                                    # browser tests (Playwright; first: npx playwright install chromium)
 ```
 
+**Database tests** (real SQL and row-level security) run when `TEST_DATABASE_URL` is set; local Supabase works:
+
+```bash
+TEST_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres pytest server/tests/db
+```
+
 **Checks** (the same ones CI runs):
 
 ```bash
@@ -130,12 +136,18 @@ ruff check . && ruff format --check . && pytest       # model tests skip until t
 cd web && npm run lint && npm run format:check && npm run typecheck && npm test && npm run build
 ```
 
-**Supabase** (accounts and database), once per machine:
+**Supabase** (accounts and database) runs locally through its CLI, in Docker:
 
 ```bash
-npx supabase login                                     # opens the browser
-npx supabase link --project-ref fewhxkyzbmwtegekiyxp   # asks for the database password
+npx supabase start -x imgproxy,storage-api,edge-runtime,logflare,vector,realtime,supavisor
+#   API      http://127.0.0.1:54321     (the Docker stack and web app use this)
+#   Studio   http://127.0.0.1:54323     (browse tables and users)
+#   Mailpit  http://127.0.0.1:54324     (sign-in emails land here; nothing is really sent)
+npx supabase db reset       # recreate the local database from supabase/migrations
+npx supabase stop           # stop it (data is kept until `supabase stop --no-backup`)
 ```
+
+The hosted project (`fewhxkyzbmwtegekiyxp`) is set up but not used until deployment (M6); then `npx supabase link` and `npx supabase db push` apply the same migrations there.
 
 Copy `.env.example` to `.env` for local settings. The full local setup is in [§12 of the development plan](docs/DEVELOPMENT_PLAN.md#12-local-development-setup).
 

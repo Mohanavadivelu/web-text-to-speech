@@ -50,6 +50,7 @@
               "too_long",
               "quota_exceeded",
               "rate_limited",
+              "unauthorized",
               "busy",
               "not_found",
               "internal"
@@ -135,6 +136,130 @@
         "title": "HealthOut",
         "type": "object"
       },
+      "HistoryItem": {
+        "properties": {
+          "audio_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Audio Seconds"
+          },
+          "blend_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blend Ratio"
+          },
+          "blend_voice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blend Voice"
+          },
+          "chars": {
+            "title": "Chars",
+            "type": "integer"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "lang": {
+            "title": "Lang",
+            "type": "string"
+          },
+          "pitch": {
+            "title": "Pitch",
+            "type": "number"
+          },
+          "speed": {
+            "title": "Speed",
+            "type": "number"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          },
+          "voice": {
+            "title": "Voice",
+            "type": "string"
+          },
+          "wav_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wav Url"
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "lang",
+          "voice",
+          "blend_voice",
+          "blend_ratio",
+          "speed",
+          "pitch",
+          "chars",
+          "audio_seconds",
+          "url",
+          "wav_url"
+        ],
+        "title": "HistoryItem",
+        "type": "object"
+      },
+      "HistoryOut": {
+        "properties": {
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items",
+          "days"
+        ],
+        "title": "HistoryOut",
+        "type": "object"
+      },
       "JobCreate": {
         "properties": {
           "blend_ratio": {
@@ -188,6 +313,19 @@
             "minLength": 1,
             "title": "Text",
             "type": "string"
+          },
+          "turnstile_token": {
+            "anyOf": [
+              {
+                "maxLength": 4096,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Required for anonymous visitors",
+            "title": "Turnstile Token"
           },
           "voice": {
             "default": "af_heart",
@@ -282,6 +420,18 @@
             ],
             "description": "Signed MP3 link, valid for an hour (when done)",
             "title": "Url"
+          },
+          "wav_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Signed WAV link (signed-in users)",
+            "title": "Wav Url"
           }
         },
         "required": [
@@ -328,6 +478,73 @@
         "title": "LanguageOut",
         "type": "object"
       },
+      "LimitsOut": {
+        "properties": {
+          "daily_chars": {
+            "title": "Daily Chars",
+            "type": "integer"
+          },
+          "max_active_jobs": {
+            "title": "Max Active Jobs",
+            "type": "integer"
+          },
+          "max_chars": {
+            "title": "Max Chars",
+            "type": "integer"
+          },
+          "uploads": {
+            "title": "Uploads",
+            "type": "boolean"
+          },
+          "wav": {
+            "title": "Wav",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "max_chars",
+          "daily_chars",
+          "max_active_jobs",
+          "uploads",
+          "wav"
+        ],
+        "title": "LimitsOut",
+        "type": "object"
+      },
+      "MeOut": {
+        "properties": {
+          "chars_today": {
+            "title": "Chars Today",
+            "type": "integer"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/LimitsOut"
+          },
+          "signed_in": {
+            "title": "Signed In",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "signed_in",
+          "email",
+          "limits",
+          "chars_today"
+        ],
+        "title": "MeOut",
+        "type": "object"
+      },
       "Pronunciation": {
         "properties": {
           "say": {
@@ -348,6 +565,23 @@
           "say"
         ],
         "title": "Pronunciation",
+        "type": "object"
+      },
+      "PronunciationsBody": {
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/Pronunciation"
+            },
+            "maxItems": 200,
+            "title": "Entries",
+            "type": "array"
+          }
+        },
+        "required": [
+          "entries"
+        ],
+        "title": "PronunciationsBody",
         "type": "object"
       },
       "TextIn": {
@@ -501,7 +735,7 @@
     },
     "/v1/files/extract": {
       "post": {
-        "description": "Text from a .txt, .md, .docx or .pdf file (up to 5 MB). PDF text comes back cleaned.",
+        "description": "Text from a .txt, .md, .docx or .pdf file (up to 5 MB; signed-in users).\n\nPDF text comes back cleaned.",
         "operationId": "extract_v1_files_extract_post",
         "requestBody": {
           "content": {
@@ -523,6 +757,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "413": {
             "content": {
@@ -593,6 +837,162 @@
         ]
       }
     },
+    "/v1/me": {
+      "get": {
+        "description": "Who you are (if signed in), your limits and today's usage. Works for everyone.",
+        "operationId": "me_v1_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Me",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/history": {
+      "get": {
+        "description": "Your finished audio from the last 7 days, newest first, with fresh download links.",
+        "operationId": "history_v1_me_history_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "History",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/pronunciations": {
+      "get": {
+        "description": "Your saved pronunciations, applied to every job you create.",
+        "operationId": "get_pronunciations_v1_me_pronunciations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PronunciationsBody"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Get Pronunciations",
+        "tags": [
+          "me"
+        ]
+      },
+      "put": {
+        "description": "Replace your saved pronunciations. \"say\" is a spelling, or phonemes in slashes.",
+        "operationId": "put_pronunciations_v1_me_pronunciations_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PronunciationsBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PronunciationsBody"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Put Pronunciations",
+        "tags": [
+          "me"
+        ]
+      }
+    },
     "/v1/text/clean": {
       "post": {
         "description": "Fix pasted text: quotes, links, markdown symbols, lines broken mid-sentence.",
@@ -617,6 +1017,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "413": {
             "content": {
@@ -657,7 +1067,7 @@
     },
     "/v1/tts/jobs": {
       "post": {
-        "description": "Queue text for speech. Follow it live on `stream_url`, or poll the job.",
+        "description": "Queue text for speech. Follow it live on `stream_url`, or poll the job.\n\nAnonymous visitors must include a Cloudflare Turnstile token. Signed-in users'\nsaved pronunciations are applied unless the request brings its own.",
         "operationId": "create_job_v1_tts_jobs_post",
         "requestBody": {
           "content": {
@@ -679,6 +1089,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "404": {
             "content": {
@@ -763,6 +1183,16 @@
             },
             "description": "Successful Response"
           },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
           "404": {
             "content": {
               "application/json": {
@@ -843,6 +1273,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
           },
           "404": {
             "content": {

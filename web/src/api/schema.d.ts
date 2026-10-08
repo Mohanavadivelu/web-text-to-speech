@@ -35,7 +35,9 @@ export interface paths {
     put?: never
     /**
      * Extract
-     * @description Text from a .txt, .md, .docx or .pdf file (up to 5 MB). PDF text comes back cleaned.
+     * @description Text from a .txt, .md, .docx or .pdf file (up to 5 MB; signed-in users).
+     *
+     *     PDF text comes back cleaned.
      */
     post: operations['extract_v1_files_extract_post']
     delete?: never
@@ -57,6 +59,70 @@ export interface paths {
      */
     get: operations['health_v1_health_get']
     put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/me': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Me
+     * @description Who you are (if signed in), your limits and today's usage. Works for everyone.
+     */
+    get: operations['me_v1_me_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/me/history': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * History
+     * @description Your finished audio from the last 7 days, newest first, with fresh download links.
+     */
+    get: operations['history_v1_me_history_get']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/v1/me/pronunciations': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * Get Pronunciations
+     * @description Your saved pronunciations, applied to every job you create.
+     */
+    get: operations['get_pronunciations_v1_me_pronunciations_get']
+    /**
+     * Put Pronunciations
+     * @description Replace your saved pronunciations. "say" is a spelling, or phonemes in slashes.
+     */
+    put: operations['put_pronunciations_v1_me_pronunciations_put']
     post?: never
     delete?: never
     options?: never
@@ -96,6 +162,9 @@ export interface paths {
     /**
      * Create Job
      * @description Queue text for speech. Follow it live on `stream_url`, or poll the job.
+     *
+     *     Anonymous visitors must include a Cloudflare Turnstile token. Signed-in users'
+     *     saved pronunciations are applied unless the request brings its own.
      */
     post: operations['create_job_v1_tts_jobs_post']
     delete?: never
@@ -180,6 +249,7 @@ export interface components {
         | 'too_long'
         | 'quota_exceeded'
         | 'rate_limited'
+        | 'unauthorized'
         | 'busy'
         | 'not_found'
         | 'internal'
@@ -214,6 +284,40 @@ export interface components {
       /** Workers */
       workers: number
     }
+    /** HistoryItem */
+    HistoryItem: {
+      /** Audio Seconds */
+      audio_seconds: number | null
+      /** Blend Ratio */
+      blend_ratio: number | null
+      /** Blend Voice */
+      blend_voice: string | null
+      /** Chars */
+      chars: number
+      /** Created At */
+      created_at: string
+      /** Id */
+      id: string
+      /** Lang */
+      lang: string
+      /** Pitch */
+      pitch: number
+      /** Speed */
+      speed: number
+      /** Url */
+      url: string | null
+      /** Voice */
+      voice: string
+      /** Wav Url */
+      wav_url: string | null
+    }
+    /** HistoryOut */
+    HistoryOut: {
+      /** Days */
+      days: number
+      /** Items */
+      items: components['schemas']['HistoryItem'][]
+    }
     /** JobCreate */
     JobCreate: {
       /**
@@ -246,6 +350,11 @@ export interface components {
        * @description Text to speak (limit depends on the account)
        */
       text: string
+      /**
+       * Turnstile Token
+       * @description Required for anonymous visitors
+       */
+      turnstile_token?: string | null
       /**
        * Voice
        * @default af_heart
@@ -281,6 +390,11 @@ export interface components {
        * @description Signed MP3 link, valid for an hour (when done)
        */
       url?: string | null
+      /**
+       * Wav Url
+       * @description Signed WAV link (signed-in users)
+       */
+      wav_url?: string | null
     }
     /** LanguageOut */
     LanguageOut: {
@@ -295,12 +409,40 @@ export interface components {
       /** Voices */
       voices: components['schemas']['VoiceOut'][]
     }
+    /** LimitsOut */
+    LimitsOut: {
+      /** Daily Chars */
+      daily_chars: number
+      /** Max Active Jobs */
+      max_active_jobs: number
+      /** Max Chars */
+      max_chars: number
+      /** Uploads */
+      uploads: boolean
+      /** Wav */
+      wav: boolean
+    }
+    /** MeOut */
+    MeOut: {
+      /** Chars Today */
+      chars_today: number
+      /** Email */
+      email: string | null
+      limits: components['schemas']['LimitsOut']
+      /** Signed In */
+      signed_in: boolean
+    }
     /** Pronunciation */
     Pronunciation: {
       /** Say */
       say: string
       /** Word */
       word: string
+    }
+    /** PronunciationsBody */
+    PronunciationsBody: {
+      /** Entries */
+      entries: components['schemas']['Pronunciation'][]
     }
     /** TextIn */
     TextIn: {
@@ -398,6 +540,15 @@ export interface operations {
           'application/json': components['schemas']['ExtractOut']
         }
       }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
       /** @description Request Entity Too Large */
       413: {
         headers: {
@@ -456,6 +607,144 @@ export interface operations {
       }
     }
   }
+  me_v1_me_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['MeOut']
+        }
+      }
+    }
+  }
+  history_v1_me_history_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['HistoryOut']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  get_pronunciations_v1_me_pronunciations_get: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PronunciationsBody']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
+  put_pronunciations_v1_me_pronunciations_put: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PronunciationsBody']
+      }
+    }
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['PronunciationsBody']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
+    }
+  }
   clean_v1_text_clean_post: {
     parameters: {
       query?: never
@@ -476,6 +765,15 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['TextOut']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
         }
       }
       /** @description Request Entity Too Large */
@@ -527,6 +825,15 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['JobOut']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
         }
       }
       /** @description Not Found */
@@ -596,6 +903,15 @@ export interface operations {
           'application/json': components['schemas']['JobOut']
         }
       }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
+        }
+      }
       /** @description Not Found */
       404: {
         headers: {
@@ -661,6 +977,15 @@ export interface operations {
         }
         content: {
           'application/json': components['schemas']['JobOut']
+        }
+      }
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          'application/json': components['schemas']['ErrorResponse']
         }
       }
       /** @description Not Found */

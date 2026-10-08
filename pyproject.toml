@@ -33,6 +33,7 @@ testpaths = ["server/tests"]
 addopts = "-ra --strict-markers"
 markers = [
   "slow: needs the speech model (deselect with -m 'not slow')",
+  "db: needs a Postgres server (TEST_DATABASE_URL)",
 ]
 filterwarnings = [
   # misaki (third-party) still uses importlib.resources.open_text

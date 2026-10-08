@@ -16,6 +16,7 @@ STATUS = {
     "too_long": 413,
     "quota_exceeded": 429,
     "rate_limited": 429,
+    "unauthorized": 401,
     "busy": 503,
     "not_found": 404,
     "internal": 500,

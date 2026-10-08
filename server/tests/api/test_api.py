@@ -1,71 +1,15 @@
 import json
 import threading
 
-import fakeredis
 import pytest
 from fastapi import WebSocketDisconnect
-from fastapi.testclient import TestClient
 
 from server import events
-from server.api.deps import Services
-from server.api.main import create_app
-from server.config import Settings
-from server.tests.fakes import FakeEngine, FakeQueue, FakeStorage
-from server.worker.jobs import JobRequest, run_job
-
-SHORT = "Hello there."
-
-
-class Env:
-    """Shared fake Redis server, queue and storage; each client gets its own connection."""
-
-    def __init__(self):
-        self.server = fakeredis.FakeServer()
-        self.settings = Settings(_env_file=None, rate_limit_per_minute=1000)
-        self.queue = FakeQueue()
-        self.storage = FakeStorage()
-        self.redis = fakeredis.FakeRedis(server=self.server)  # the worker's (sync) view
-
-    def client(self) -> TestClient:
-        svc = Services(
-            settings=self.settings,
-            redis=fakeredis.FakeAsyncRedis(server=self.server),
-            queue=self.queue,
-            storage=self.storage,
-        )
-        return TestClient(create_app(svc))
-
-
-@pytest.fixture
-def env():
-    return Env()
-
-
-@pytest.fixture
-def client(env):
-    with env.client() as c:
-        yield c
-
-
-def _other_client(env):
-    return env.client()
-
-
-def _work(env, job_id, engine=None):
-    """Do what a worker does with the job that was queued."""
-    _, request, _ = next(j for j in env.queue.jobs if j[0] == job_id)
-    return run_job(
-        job_id,
-        JobRequest(**request),
-        engine=engine or FakeEngine(),
-        storage=env.storage,
-        redis=env.redis,
-        settings=env.settings,
-    )
-
-
-def _create(client, **body):
-    return client.post("/v1/tts/jobs", json={"text": SHORT} | body)
+from server.tests.api.conftest import ALICE
+from server.tests.api.conftest import create as _create
+from server.tests.api.conftest import other_client as _other_client
+from server.tests.api.conftest import work as _work
+from server.tests.fakes import FakeEngine
 
 
 # ── Meta ─────────────────────────────────────────────────────────────────────
@@ -304,13 +248,25 @@ def test_clean_text(client):
     assert response.json() == {"text": '"Hi" see.'}
 
 
-def test_extract_a_text_file(client):
-    response = client.post("/v1/files/extract", files={"file": ("note.txt", b"Hello file.")})
+def test_extract_a_text_file(env):
+    with env.client(ALICE) as client:
+        response = client.post("/v1/files/extract", files={"file": ("note.txt", b"Hello file.")})
     assert response.status_code == 200
     assert response.json() == {"text": "Hello file.", "cleaned": False, "characters": 11}
 
 
-def test_extract_rejects_bad_and_huge_files(client, env):
+def test_uploads_need_an_account(client):
+    response = client.post("/v1/files/extract", files={"file": ("note.txt", b"Hi.")})
+    assert response.status_code == 401
+    assert "Sign in" in response.json()["error"]["message"]
+
+
+def test_extract_rejects_bad_and_huge_files(env):
+    with env.client(ALICE) as client:
+        _check_bad_files(client, env)
+
+
+def _check_bad_files(client, env):
     fake_pdf = client.post("/v1/files/extract", files={"file": ("x.pdf", b"not a pdf")})
     assert fake_pdf.status_code == 422
     assert "isn't a real PDF" in fake_pdf.json()["error"]["message"]

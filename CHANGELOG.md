@@ -30,5 +30,12 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - `GET /v1/config` (the visitor's limits) and download links that save as `kokoro-<job>.mp3`.
 - Browser tests (Playwright) for desktop and phone, run in CI against the Docker stack, plus unit tests for the streaming player.
 
+- Accounts (M5), on local Supabase in development: email-link sign-in; signed-in limits (20,000 characters per request, 100,000 a day, 3 active jobs, 30 requests a minute per account) and anonymous limits (2,000 / 10,000 / 2 / 10 per IP); a usage meter; WAV downloads, document uploads, a 7-day History page and saved pronunciations for signed-in users.
+- Database schema (`supabase/migrations`) with row-level security: users read only their own jobs, pronunciations and profile; nobody reads usage statistics. Job text is never stored.
+- `GET /v1/me`, `GET /v1/me/history`, `GET/PUT /v1/me/pronunciations`.
+- Database tests against real Postgres in CI, and browser tests for sign-in, History, pronunciations and sign-out.
+
 ### Security
+- Supabase tokens are verified by the API against the project's public keys (signature, expiry, audience, issuer); an invalid token is refused, never treated as anonymous. WebSockets carry the token as a subprotocol so it never appears in URLs or logs.
+- Anonymous job creation requires Cloudflare Turnstile; the API refuses to start in production without a Turnstile secret.
 - The API refuses to start in production with the development cookie secret, and only trusts `CF-Connecting-IP` when configured to (it's spoofable without Cloudflare in front).

@@ -13,7 +13,7 @@ from server.api.schemas import ErrorResponse, ExtractOut, TextIn, TextOut
 from server.engine.text import ExtractError, clean_text
 
 router = APIRouter(prefix="/v1", tags=["text"])
-ERRORS = {code: {"model": ErrorResponse} for code in (413, 422, 429)}
+ERRORS = {code: {"model": ErrorResponse} for code in (401, 413, 422, 429)}
 
 
 @router.post("/text/clean", response_model=TextOut, responses=ERRORS)
@@ -29,9 +29,14 @@ async def extract(
     caller: Caller = Depends(caller_dependency),
     svc: Services = Depends(services),
 ) -> ExtractOut:
-    """Text from a .txt, .md, .docx or .pdf file (up to 5 MB). PDF text comes back cleaned."""
+    """Text from a .txt, .md, .docx or .pdf file (up to 5 MB; signed-in users).
+
+    PDF text comes back cleaned."""
     settings = svc.settings
-    await limits.check_rate(svc.redis, settings, caller.ip, bucket="files")
+    lim = limits.limits_for(caller, settings)
+    await limits.check_rate(svc.redis, caller, lim, bucket="files")
+    if not lim.uploads:
+        raise APIError("unauthorized", "Sign in to open documents.")
     set_cookie(response, caller, secure=settings.app_env == "production")
 
     data = await file.read(settings.max_upload_bytes + 1)

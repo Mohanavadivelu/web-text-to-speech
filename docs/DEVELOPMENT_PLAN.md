@@ -151,6 +151,8 @@ Builds `server/engine/` as described in §5 of the Stage 1 plan.
 
 ## M5: Accounts and limits
 
+**Development runs on local Supabase** (the CLI's Docker stack: Postgres, auth, Studio, and Mailpit to catch sign-in emails). Sign-in is by email link locally; Google sign-in is configured on the hosted project at deployment (M6), with a **Web application** OAuth client whose redirect URI is `https://<project>.supabase.co/auth/v1/callback`. Local and hosted projects both sign tokens with ES256 keys (JWKS), so the code is the same for both.
+
 | ID | Task | Est. | Done when |
 |---|---|---|---|
 | M5.1 | Database migrations in `supabase/migrations/` from §10 (`profiles`, `jobs`, `pronunciations`, `usage_daily`) with row-level security | 0.5 | Migrations apply to a fresh Supabase project; RLS tests pass |
@@ -159,6 +161,14 @@ Builds `server/engine/` as described in §5 of the Stage 1 plan.
 | M5.4 | Full limits from §10: per-request characters, characters per day, running/queued jobs, requests per minute; values in config; `GET /v1/me/usage` | 0.5 | Tests for each limit and tier |
 | M5.5 | Turnstile on anonymous job creation and on sign-up | 0.25 | Requests without a token are rejected |
 | M5.6 | History page (7 days, fresh signed URLs) and pronunciations editor (`GET/PUT /v1/me/pronunciations`, applied with `engine.text.apply_pronunciations` in the worker) | 0.5 | A saved pronunciation changes the audio |
+
+**Result (M5 done, on local Supabase):** email-link sign-in works end to end in the browser (the link is read from the local Mailpit inbox in the tests); signed-in users get 20,000 characters per request, 100,000 a day, WAV downloads, uploads, a 7-day history and saved pronunciations; anonymous visitors pass Cloudflare Turnstile and get 2,000 / 10,000. Tests: 108 Python (including 5 against real Postgres that check row-level security with Supabase's default grants), 14 web unit tests and 11 browser tests. Notes:
+- The API verifies Supabase tokens itself (JWKS: signature, expiry, audience, issuer); a bad token is an error, never silently anonymous. WebSockets carry the token as a subprotocol, never in the URL.
+- Job records and usage statistics are best-effort: if Postgres is down, speech still works.
+- The daily quota counts only characters that reach a worker; results served from the cache are free. Signed-in users skip the cache because they also get a WAV.
+- Pronunciations are a page rather than a dialog (simpler on phones).
+- Bug found by the browser tests: Cancel pressed during the robot check did nothing, because no job existed yet. It now stops before the job is created.
+- The web bundle grew from 83 to 142 KB gzipped, mostly the Supabase client; loading it only when needed is a later optimisation.
 
 ---
 

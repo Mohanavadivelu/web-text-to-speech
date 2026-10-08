@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 
-import { toast } from './helpers'
+import { signIn, toast } from './helpers'
 
 const unique = () => `Run ${Date.now()}.`
 
@@ -40,6 +40,7 @@ test('cancel a long job', async ({ page }) => {
 })
 
 test('open a text file, clean it, and undo', async ({ page }) => {
+  await signIn(page) // opening documents needs an account
   await page.locator('input[type=file]').setInputFiles({
     name: 'notes.txt',
     mimeType: 'text/plain',

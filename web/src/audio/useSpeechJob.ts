@@ -3,7 +3,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-import { api, ApiError, streamUrl, type Job, type JobCreate } from '../api/client'
+import { api, ApiError, openStream, type Job, type JobCreate } from '../api/client'
 import { pcm16ToFloat32 } from './pcm'
 import { StreamPlayer, UrlPlayer, type Player } from './player'
 
@@ -16,6 +16,7 @@ export interface SpeechJob {
   queuePosition: number | null
   estimatedSeconds: number
   url: string | null
+  wavUrl: string | null
   error: ApiError | null
   player: Player | null
 }
@@ -27,6 +28,7 @@ const IDLE: SpeechJob = {
   queuePosition: null,
   estimatedSeconds: 0,
   url: null,
+  wavUrl: null,
   error: null,
   player: null,
 }
@@ -36,7 +38,7 @@ const MAX_RECONNECTS = 3
 type StreamEvent =
   | { type: 'started'; sample_rate: number; estimated_seconds: number }
   | { type: 'progress'; percent: number }
-  | { type: 'done'; duration: number; url: string }
+  | { type: 'done'; duration: number; url: string; wav_url?: string }
   | { type: 'error'; message: string }
   | { type: 'cancelled' }
 
@@ -45,6 +47,7 @@ export function useSpeechJob(onFinished?: (state: SpeechJob) => void) {
   const socket = useRef<WebSocket | null>(null)
   const pollTimer = useRef<number | null>(null)
   const playerRef = useRef<Player | null>(null)
+  const cancelRequested = useRef(false)
   const finishedRef = useRef(onFinished)
   useEffect(() => {
     finishedRef.current = onFinished
@@ -81,7 +84,7 @@ export function useSpeechJob(onFinished?: (state: SpeechJob) => void) {
       let messages = 0
       let replayed = 0 // audio bytes seen on this connection
       let received = kept
-      const ws = new WebSocket(streamUrl(job.stream_url))
+      const ws = openStream(job.stream_url)
       ws.binaryType = 'arraybuffer'
       socket.current = ws
 
@@ -119,7 +122,12 @@ export function useSpeechJob(onFinished?: (state: SpeechJob) => void) {
           case 'done':
             finalSeen = true
             player.finish()
-            update({ status: 'ready', progress: 100, url: event.url })
+            update({
+              status: 'ready',
+              progress: 100,
+              url: event.url,
+              wavUrl: event.wav_url ?? null,
+            })
             break
           case 'error':
             finalSeen = true
@@ -155,22 +163,36 @@ export function useSpeechJob(onFinished?: (state: SpeechJob) => void) {
 
   /** Call from a click/keypress handler: browsers only allow audio after a user gesture. */
   const generate = useCallback(
-    async (body: JobCreate) => {
+    /** getBotToken: for anonymous visitors, a Turnstile token fetched after the player
+     * exists (the player must be created inside the click for the browser to allow sound). */
+    async (body: JobCreate, getBotToken?: () => Promise<string | null>) => {
       stopFollowing()
       playerRef.current?.destroy()
       const player = new StreamPlayer()
       playerRef.current = player
       player.play() // plays as soon as audio arrives
+      cancelRequested.current = false
       setState({ ...IDLE, status: 'queued', player, estimatedSeconds: 0 })
 
       let job: Job
       try {
-        job = await api.createJob(body)
+        const token = getBotToken ? await getBotToken() : null
+        if (cancelRequested.current) return // cancelled during the robot check: no job made
+        job = await api.createJob(token ? { ...body, turnstile_token: token } : body)
       } catch (err) {
         player.destroy()
         playerRef.current = null
-        const error = err instanceof ApiError ? err : new ApiError('internal', String(err))
+        const error =
+          err instanceof ApiError
+            ? err
+            : new ApiError('internal', err instanceof Error ? err.message : String(err))
         update({ status: 'error', error, player: null })
+        return
+      }
+
+      if (cancelRequested.current) {
+        // Cancelled while the job was being created: stop it right away
+        void api.cancelJob(job.id).catch(() => {})
         return
       }
 
@@ -185,6 +207,7 @@ export function useSpeechJob(onFinished?: (state: SpeechJob) => void) {
           status: 'ready',
           progress: 100,
           url: job.url,
+          wavUrl: job.wav_url ?? null,
           player: cached,
           estimatedSeconds: job.estimated_seconds ?? 0,
         })
@@ -221,7 +244,14 @@ export function useSpeechJob(onFinished?: (state: SpeechJob) => void) {
 
   const cancel = useCallback(async () => {
     const id = state.job?.id
-    if (!id) return
+    if (!id) {
+      // Still checking for robots or creating the job: generate() sees this and stops
+      cancelRequested.current = true
+      playerRef.current?.destroy()
+      playerRef.current = null
+      update({ status: 'cancelled', player: null })
+      return
+    }
     try {
       await api.cancelJob(id) // the "cancelled" event arrives on the stream
     } catch {

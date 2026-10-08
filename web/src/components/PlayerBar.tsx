@@ -13,9 +13,11 @@ interface Props {
   player: Player | null
   estimatedSeconds: number
   downloadUrl: string | null
+  /** Signed-in users also get a WAV. */
+  wavUrl?: string | null
 }
 
-export function PlayerBar({ player: source, estimatedSeconds, downloadUrl }: Props) {
+export function PlayerBar({ player: source, estimatedSeconds, downloadUrl, wavUrl }: Props) {
   const player = usePlayer(source)
   const [volume, setVolume] = useState(1)
   const [muted, setMuted] = useState(false)
@@ -87,6 +89,11 @@ export function PlayerBar({ player: source, estimatedSeconds, downloadUrl }: Pro
       >
         <Download size={16} /> <span>Download</span>
       </a>
+      {wavUrl && (
+        <a className={styles.wav} href={wavUrl} download title="Download WAV (uncompressed)">
+          WAV
+        </a>
+      )}
     </div>
   )
 }

@@ -16,6 +16,7 @@ class ErrorBody(BaseModel):
         "too_long",
         "quota_exceeded",
         "rate_limited",
+        "unauthorized",
         "busy",
         "not_found",
         "internal",
@@ -64,6 +65,9 @@ class JobCreate(BaseModel):
     speed: float = Field(1.0, ge=SPEED_RANGE[0], le=SPEED_RANGE[1])
     pitch: float = Field(0.0, ge=PITCH_RANGE[0], le=PITCH_RANGE[1])
     pronunciations: list[Pronunciation] = Field(default_factory=list, max_length=200)
+    turnstile_token: str | None = Field(
+        None, max_length=4096, description="Required for anonymous visitors"
+    )
 
     @model_validator(mode="after")
     def _check_voice(self) -> JobCreate:
@@ -81,6 +85,7 @@ class JobOut(BaseModel):
     estimated_seconds: float | None = None
     audio_seconds: float | None = None
     url: str | None = Field(None, description="Signed MP3 link, valid for an hour (when done)")
+    wav_url: str | None = Field(None, description="Signed WAV link (signed-in users)")
     error: str | None = None
     stream_url: str
 
@@ -98,6 +103,52 @@ class ExtractOut(BaseModel):
     text: str
     cleaned: bool
     characters: int
+
+
+class LimitsOut(BaseModel):
+    max_chars: int
+    daily_chars: int
+    max_active_jobs: int
+    uploads: bool
+    wav: bool
+
+
+class MeOut(BaseModel):
+    signed_in: bool
+    email: str | None
+    limits: LimitsOut
+    chars_today: int
+
+
+class HistoryItem(BaseModel):
+    id: str
+    created_at: str
+    lang: str
+    voice: str
+    blend_voice: str | None
+    blend_ratio: float | None
+    speed: float
+    pitch: float
+    chars: int
+    audio_seconds: float | None
+    url: str | None
+    wav_url: str | None
+
+
+class HistoryOut(BaseModel):
+    items: list[HistoryItem]
+    days: int
+
+
+class PronunciationsBody(BaseModel):
+    entries: list[Pronunciation] = Field(max_length=200)
+
+    @model_validator(mode="after")
+    def _unique_words(self) -> PronunciationsBody:
+        words = [e.word.strip().lower() for e in self.entries]
+        if len(words) != len(set(words)):
+            raise ValueError("Each word can only have one pronunciation.")
+        return self
 
 
 class ConfigOut(BaseModel):

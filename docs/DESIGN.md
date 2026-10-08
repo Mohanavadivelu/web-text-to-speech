@@ -5,7 +5,7 @@
 > **Fonts:** Inter (interface), JetBrains Mono (editor, times, numbers), from Google Fonts with system fallbacks
 > **Icons:** [Lucide](https://lucide.dev) line icons, 1.5 px stroke; no emoji in the interface
 > **Supported widths:** 360 px and up; no horizontal page scrolling at any width
-> **Built so far (M4):** everything below except the playback-speed menu, the shortcuts dialog and the account features (usage meter, pronunciations, history, sign-in, WAV download), which arrive with M5. The editor has no undo/redo buttons: Ctrl+Z works while typing, and Clean text / Open file offer Undo in their toast.
+> **Built so far (M5):** everything below except the playback-speed menu and the shortcuts dialog. Sign in, History and Pronunciations are full pages (§10's dialogs became pages: simpler on phones), and sign-in is by email link (Google arrives with the hosted project in M6). The editor has no undo/redo buttons: Ctrl+Z works while typing, and Clean text / Open file offer Undo in their toast.
 
 ---
 

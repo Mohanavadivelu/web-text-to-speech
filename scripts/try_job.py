@@ -69,6 +69,9 @@ async def run(
 ) -> JobResult:
     """Create one job and collect its stream until the final event."""
     result = JobResult(queued_at=time.perf_counter())
+    # Anonymous jobs need a Turnstile token; the development stack uses Cloudflare's test
+    # secret, which accepts this dummy token (a real deployment needs a real one)
+    body = {"turnstile_token": "XXXX.DUMMY.TOKEN.XXXX"} | body
     status, job, cookie = await asyncio.to_thread(_request, "POST", f"{api}/v1/tts/jobs", body)
     result.status_code = status
     if status != 201:

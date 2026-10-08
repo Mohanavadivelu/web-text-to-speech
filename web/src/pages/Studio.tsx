@@ -10,10 +10,13 @@ import { Sheet } from '../components/Sheet'
 import { TextEditor, type TextEditorHandle } from '../components/TextEditor'
 import { VoicePanel } from '../components/VoicePanel'
 import { errorToast } from '../lib/errors'
+import { useMe } from '../lib/me'
+import { navigate } from '../lib/router'
 import { reconcile, useVoiceSettings } from '../lib/settings'
 import { useAppStatus } from '../lib/status'
 import { load, save } from '../lib/storage'
 import { useToast } from '../lib/toast'
+import { getBotToken } from '../lib/turnstile'
 import { formatDuration, formatCount } from '../lib/text'
 import { useMediaQuery } from '../lib/useMediaQuery'
 import styles from './Studio.module.css'
@@ -28,6 +31,8 @@ const FALLBACK_CONFIG: Config = {
 
 export function Studio() {
   const toast = useToast()
+  const { me, refresh: refreshMe } = useMe()
+  const maxChars = me.limits.max_chars
   const { setStatus } = useAppStatus()
   const wide = useMediaQuery('(min-width: 1024px)')
   const editor = useRef<TextEditorHandle>(null)
@@ -43,6 +48,7 @@ export function Studio() {
 
   const onFinished = useCallback(
     (job: SpeechJob) => {
+      refreshMe() // today's usage changed
       if (job.status === 'ready') {
         const seconds = job.player?.duration || job.job?.audio_seconds || 0
         toast({
@@ -58,7 +64,7 @@ export function Studio() {
         setAnnouncement(job.error.message)
       }
     },
-    [toast],
+    [toast, refreshMe],
   )
   const speech = useSpeechJob(onFinished)
   const busy = speech.status === 'queued' || speech.status === 'streaming'
@@ -123,25 +129,28 @@ export function Studio() {
     if (busy) return
     const source = editor.current?.selection() ?? text
     if (!source.trim()) return
-    if (source.length > config.max_chars) {
+    if (source.length > maxChars) {
       toast({
         kind: 'error',
-        message: `This text is over the limit of ${formatCount(config.max_chars)} characters. Select a part to generate just that.`,
+        message: `This text is over the limit of ${formatCount(maxChars)} characters. Select a part to generate just that.`,
       })
       return
     }
     setAnnouncement('Generating speech…')
-    void speech.generate({
-      text: source,
-      lang: settings.lang,
-      voice: settings.voice,
-      speed: settings.speed,
-      pitch: settings.pitch,
-      blend_voice: settings.blendVoice,
-      blend_ratio: settings.blendRatio,
-      pronunciations: [],
-    })
-  }, [busy, text, config.max_chars, settings, speech, toast])
+    void speech.generate(
+      {
+        text: source,
+        lang: settings.lang,
+        voice: settings.voice,
+        speed: settings.speed,
+        pitch: settings.pitch,
+        blend_voice: settings.blendVoice,
+        blend_ratio: settings.blendRatio,
+        pronunciations: [], // signed-in users' saved pronunciations are applied by the server
+      },
+      me.signed_in ? undefined : getBotToken,
+    )
+  }, [busy, text, maxChars, settings, speech, toast, me.signed_in])
 
   const replaceText = useCallback(
     (next: string, message: string) => {
@@ -154,6 +163,14 @@ export function Studio() {
 
   const openFile = useCallback(
     async (file: File) => {
+      if (!me.limits.uploads) {
+        toast({
+          kind: 'info',
+          message: 'Sign in to open documents.',
+          action: { label: 'Sign in', run: () => navigate('/signin') },
+        })
+        return
+      }
       if (file.size > config.max_upload_mb * 2 ** 20) {
         toast({ kind: 'error', message: `Files can be up to ${config.max_upload_mb} MB.` })
         return
@@ -164,17 +181,17 @@ export function Studio() {
           result.text,
           `Opened ${file.name}${result.cleaned ? ' (text cleaned)' : ''}: ${formatCount(result.characters)} characters.`,
         )
-        if (result.characters > config.max_chars) {
+        if (result.characters > maxChars) {
           toast({
             kind: 'warning',
-            message: `That's over the ${formatCount(config.max_chars)}-character limit. Select a part to generate it.`,
+            message: `That's over the ${formatCount(maxChars)}-character limit. Select a part to generate it.`,
           })
         }
       } catch (err) {
         if (err instanceof ApiError) toast(errorToast(err))
       }
     },
-    [config, replaceText, toast],
+    [config, maxChars, me.limits.uploads, replaceText, toast],
   )
 
   const clean = useCallback(async () => {
@@ -247,7 +264,7 @@ export function Studio() {
           onTextChange={setText}
           lang={settings.lang}
           speed={settings.speed}
-          maxChars={config.max_chars}
+          maxChars={maxChars}
           zoom={zoom}
           onZoom={setZoom}
           busy={busy}
@@ -269,6 +286,7 @@ export function Studio() {
         player={speech.player}
         estimatedSeconds={speech.estimatedSeconds}
         downloadUrl={speech.url}
+        wavUrl={speech.wavUrl}
       />
       {!wide && (
         <Sheet open={sheetOpen} onClose={() => setSheetOpen(false)} title="Voice settings">
