@@ -248,6 +248,7 @@ export function Studio() {
           onClean={() => void clean()}
           documentTypes={config.document_types}
           controls={controls}
+          emotions={lang?.emotions ?? []}
         />
         {wide && (
           <aside className={styles.side}>

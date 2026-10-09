@@ -2,7 +2,7 @@ import io
 
 import pytest
 
-from server.engine import text
+from server.engines.common import text
 
 LONG_PARAGRAPH = (
     "The history of speech synthesis goes back centuries, to mechanical devices that "

@@ -10,7 +10,7 @@ from server.api.deps import Services, services
 from server.api.errors import APIError
 from server.api.isolation import extract_isolated
 from server.api.schemas import ErrorResponse, ExtractOut, TextIn, TextOut
-from server.engine.text import ExtractError, clean_text
+from server.engines.common.text import ExtractError, clean_text
 
 router = APIRouter(prefix="/v1", tags=["text"])
 ERRORS = {code: {"model": ErrorResponse} for code in (401, 413, 422, 429)}

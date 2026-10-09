@@ -14,8 +14,8 @@ from dataclasses import dataclass, field
 
 from server import events
 from server.config import Settings
-from server.engine import audio, text
-from server.engine.synth import SAMPLE_RATE, GenerationCancelled
+from server.engines.base import SAMPLE_RATE, GenerationCancelled
+from server.engines.common import audio, text
 from server.worker.storage import CONTENT_TYPES, audio_key
 
 log = logging.getLogger(__name__)
@@ -33,6 +33,7 @@ class JobRequest:
     blend_voice: str | None = None
     blend_ratio: float = 0.5
     pronunciations: list[dict] = field(default_factory=list)
+    engine: str = "kokoro"  # which engine speaks it (from the voice's language)
     owner_kind: str = "anon"  # "users" or "anon"
     owner_id: str = "local"
     wav: bool = False  # also store a WAV copy (signed-in users)

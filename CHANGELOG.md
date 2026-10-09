@@ -38,6 +38,12 @@ All notable changes to this project are recorded here. The format follows [Keep 
 - `GET /v1/me`, `GET /v1/me/history`, `GET/PUT /v1/me/pronunciations`.
 - Database tests against real Postgres in CI, and browser tests for sign-in, History, pronunciations and sign-out.
 
+- **Narravo Indic** (Indic-Mio): 22 Indian languages plus Indian English, 10 voices (4 from the model card's own recordings, 6 matching Kokoro voices), code-mixed text and emotion tags. Speed, pitch and voice mixing work as for Kokoro. Runs on CUDA at ~2.1× real time with sentence-by-sentence streaming and ~1 s cancel.
+- Engines split into separate packages: `server/engines/kokoro` and `server/engines/indic_mio`, with shared types in `base.py` and shared helpers in `common/`. The API picks the engine from the language; each engine has its own queue (`tts:kokoro`, `tts:indic`) and worker, and its own model version in the result cache key.
+- GPU image (`server/Dockerfile.gpu`) with both models built in and verified offline, and `server/docker-compose.gpu.yml` running a Kokoro worker (ONNX Runtime CUDA, ~20× real time) and an Indic-Mio worker on one GPU.
+- Studio: a language-first voice picker grouped by engine (Narravo Standard, Narravo Indic), a "Native" tag for voices recorded in Indian languages, and an emotion button in the editor that adds a tag at the end of the current sentence.
+- Voice previews for the Indic voices; `scripts/make_indic_voices.py` makes the voice embeddings.
+
 ### Security
 - Supabase tokens are verified by the API against the project's public keys (signature, expiry, audience, issuer); an invalid token is refused, never treated as anonymous. WebSockets carry the token as a subprotocol so it never appears in URLs or logs.
 - Anonymous job creation requires Cloudflare Turnstile; the API refuses to start in production without a Turnstile secret.

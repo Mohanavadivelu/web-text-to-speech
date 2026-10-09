@@ -62,8 +62,8 @@ jobs:
         with:
           path: models
           # The model files are pinned in model_store.py, so its hash identifies them
-          key: kokoro-models-${{ hashFiles('server/engine/model_store.py') }}
-      - run: python -m server.engine.model_store download
+          key: kokoro-models-${{ hashFiles('server/engines/kokoro/model_store.py') }}
+      - run: python -m server.engines.kokoro.model_store download
       - run: pytest -m slow
         env:
           REQUIRE_MODELS: '1'

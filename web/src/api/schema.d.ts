@@ -402,6 +402,16 @@ export interface components {
       code: string
       /** Default Voice */
       default_voice: string
+      /**
+       * Emotions
+       * @description Emotion tags this language understands, e.g. happy
+       */
+      emotions?: string[]
+      /**
+       * Engine
+       * @enum {string}
+       */
+      engine: 'kokoro' | 'indic_mio'
       /** Name */
       name: string
       /** Preview Text */
@@ -467,6 +477,11 @@ export interface components {
       id: string
       /** Name */
       name: string
+      /**
+       * Tags
+       * @description e.g. "native"
+       */
+      tags?: string[]
     }
     /** VoicesResponse */
     VoicesResponse: {

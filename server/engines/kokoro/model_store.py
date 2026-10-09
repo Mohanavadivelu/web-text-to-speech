@@ -9,8 +9,8 @@ so a build can never silently pick up a different model.
 
 Command line (used by the Docker build):
 
-    python -m server.engine.model_store download [--dir DIR]
-    python -m server.engine.model_store verify   [--dir DIR]
+    python -m server.engines.kokoro.model_store download [--dir DIR]
+    python -m server.engines.kokoro.model_store verify   [--dir DIR]
 """
 
 from __future__ import annotations
@@ -107,7 +107,7 @@ FILES: list[RemoteFile] = [RemoteFile(p, size, sha) for p, (size, sha) in _MODEL
 
 def models_dir() -> Path:
     """MODELS_DIR from the environment, or <repo>/models."""
-    default = Path(__file__).resolve().parents[2] / "models"
+    default = Path(__file__).resolve().parents[3] / "models"
     return Path(os.environ.get("MODELS_DIR") or default).resolve()
 
 

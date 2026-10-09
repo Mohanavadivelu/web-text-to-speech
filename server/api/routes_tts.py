@@ -12,13 +12,13 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Depends, Response, WebSocket, WebSocketDisconnect
 
-from server import events
+from server import engines, events
 from server.api import limits
 from server.api.auth import WS_PROTOCOL, Caller, caller_dependency, identify, set_cookie
 from server.api.deps import Services, services, ws_services
 from server.api.errors import APIError
 from server.api.schemas import ErrorResponse, JobCreate, JobOut
-from server.engine import model_store, text
+from server.engines.common import text
 from server.worker.jobs import JobRequest
 from server.worker.storage import audio_key
 
@@ -41,7 +41,7 @@ def cache_key(body: JobCreate, pronunciations: list[dict]) -> str:
     """Same text and settings (and pronunciations) with the same model → same audio."""
     payload = body.model_dump(mode="json", exclude={"turnstile_token", "pronunciations"}) | {
         "pronunciations": pronunciations,
-        "model": model_store.REVISION,
+        "model": engines.model_version(engines.engine_for(body.lang)),
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
@@ -184,9 +184,8 @@ async def create_job(
         return await _job_out(svc, job_id, cached)
 
     await limits.check_daily_quota(svc.redis, caller, lim, len(body.text))
-    queue = (
-        settings.queue_short if len(body.text) <= settings.short_job_chars else settings.queue_long
-    )
+    engine = engines.engine_for(body.lang)
+    queue = settings.queue_for(engine, len(body.text))
     await limits.check_queue_space(svc.queue, settings, queue)
     estimated = round(text.estimate_seconds(body.text, body.lang, body.speed), 1)
     record = {
@@ -209,6 +208,7 @@ async def create_job(
         blend_voice=body.blend_voice,
         blend_ratio=body.blend_ratio,
         pronunciations=pronunciations,
+        engine=engine,
         owner_kind=caller.kind,
         owner_id=caller.id,
         wav=lim.wav,

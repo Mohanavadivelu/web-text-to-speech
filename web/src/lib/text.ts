@@ -1,4 +1,4 @@
-// Same estimates as server/engine/text.py, so the editor footer matches the server.
+// Same estimates as server/engines/common/text.py, so the editor footer matches the server.
 
 // Characters of speech per second at speed 1.0, measured with Kokoro-82M.
 const CHARS_PER_SECOND: Record<string, number> = {

@@ -132,7 +132,7 @@ The design follows four principles:
 
 ## 5. Speech engine
 
-The engine is a Python package in `server/engine/`. It contains no web code: it turns text into audio and nothing else, so the worker, tests and benchmark scripts can all use it directly.
+The engine is a Python package in `server/engines/kokoro/` (shared helpers in `server/engines/common/`). It contains no web code: it turns text into audio and nothing else, so the worker, tests and benchmark scripts can all use it directly.
 
 ### Pipeline
 
@@ -170,7 +170,7 @@ text ─► pronunciations ─► segments ─► G2P ─► phoneme packing ─
 
 ### Built into the Docker image
 
-No system packages are needed: `espeakng-loader` bundles espeak-ng, the spaCy English model is a pinned pip dependency, and `soundfile` bundles libsndfile (including MP3 encoding). The build downloads and verifies the Kokoro ONNX model and voices with `python -m server.engine.model_store download`. The image will be roughly 1.5 GB, and containers start in seconds with no network calls.
+No system packages are needed: `espeakng-loader` bundles espeak-ng, the spaCy English model is a pinned pip dependency, and `soundfile` bundles libsndfile (including MP3 encoding). The build downloads and verifies the Kokoro ONNX model and voices with `python -m server.engines.kokoro.model_store download`. The image will be roughly 1.5 GB, and containers start in seconds with no network calls.
 
 ### Reference-audio tests
 

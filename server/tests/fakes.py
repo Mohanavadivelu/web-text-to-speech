@@ -6,7 +6,7 @@ import time
 
 import numpy as np
 
-from server.engine.synth import GenerationCancelled
+from server.engines.kokoro.synth import GenerationCancelled
 
 CHUNK = np.full(2400, 0.1, dtype=np.float32)  # 0.1 s of audio
 

@@ -59,9 +59,15 @@ class Settings(BaseSettings):
     first_segment_chars: int = 150
 
     # Jobs: short texts get their own queue so they never wait behind long ones
+    # Kokoro on a CPU uses a short and a long queue; on a GPU it's fast enough for one
+    # (SPLIT_SHORT_LONG=false). Indic-Mio always has its own queue.
     queue_short: str = "tts:short"
     queue_long: str = "tts:long"
+    queue_kokoro: str = "tts:kokoro"
+    queue_indic: str = "tts:indic"
+    split_short_long: bool = True
     short_job_chars: int = 1000
+    engine: str = "kokoro"  # the engine this worker runs (kokoro or indic_mio)
     worker_queue: str = "tts:long"  # which queue this worker serves
     job_event_ttl_seconds: int = 600  # how long live events stay replayable
     job_record_ttl_seconds: int = 86_400
@@ -78,6 +84,14 @@ class Settings(BaseSettings):
             if not self.turnstile_secret_key:
                 raise ValueError("TURNSTILE_SECRET_KEY is required in production.")
         return self
+
+    def queue_for(self, engine: str, chars: int) -> str:
+        """The queue a job goes to."""
+        if engine == "indic_mio":
+            return self.queue_indic
+        if not self.split_short_long:
+            return self.queue_kokoro
+        return self.queue_short if chars <= self.short_job_chars else self.queue_long
 
     @property
     def jwt_issuer(self) -> str:

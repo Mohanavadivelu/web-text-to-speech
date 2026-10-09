@@ -69,7 +69,7 @@ test('choose a voice in the picker: filter, preview, mix, remembered', async ({ 
   await expect(picker).toBeVisible()
   await page.screenshot({ path: 'test-results/voice-picker.png' })
 
-  await picker.getByLabel('Language filter').selectOption({ label: 'British English' })
+  await picker.getByLabel('Language').selectOption({ label: 'British English' })
   await picker.getByRole('button', { name: '♂ Male' }).click()
   const voiceList = picker.getByRole('listbox', { name: 'Voices' })
   await expect(voiceList.getByRole('option')).toHaveCount(4) // UK male voices

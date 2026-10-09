@@ -1,0 +1,54 @@
+# GPU image for the speech workers: Kokoro (ONNX Runtime CUDA) and Indic-Mio (PyTorch),
+# each in its own package under server/engines/. The API keeps using the CPU image.
+# Build from the repository root:  docker build -f server/Dockerfile.gpu .
+#
+#   Kokoro worker:     ENGINE=kokoro    ENGINE_DEVICE=cuda  arq server.worker.main.WorkerSettings
+#   Indic-Mio worker:  ENGINE=indic_mio ENGINE_DEVICE=cuda  arq server.worker.main.WorkerSettings
+#
+# Needs an NVIDIA driver supporting CUDA 12.x on the host (Docker: --gpus all).
+
+FROM python:3.12-slim AS deps
+ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+# git: MioCodec installs from GitHub; gcc: Triton compiles small kernels for torch.compile
+RUN apt-get update && apt-get install -y --no-install-recommends git gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install torch==2.14.1 torchaudio==2.11.0 --index-url https://download.pytorch.org/whl/cu126
+COPY server/requirements.txt server/requirements-gpu.txt /tmp/
+RUN pip install -r /tmp/requirements.txt \
+    && pip uninstall -y onnxruntime \
+    && pip install -r /tmp/requirements-gpu.txt
+
+# Models only need huggingface_hub, so this stage stays cached when dependencies change
+FROM python:3.12-slim AS models
+ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN pip install huggingface_hub==0.36.2
+WORKDIR /build
+COPY server/__init__.py server/__init__.py
+COPY server/engines/__init__.py server/engines/
+COPY server/engines/kokoro/__init__.py server/engines/kokoro/model_store.py server/engines/kokoro/
+COPY server/engines/indic_mio/__init__.py server/engines/indic_mio/model_store.py server/engines/indic_mio/
+RUN python -m server.engines.kokoro.model_store download --dir /models \
+    && python -m server.engines.indic_mio.model_store download --dir /models
+
+FROM python:3.12-slim
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev \
+    && rm -rf /var/lib/apt/lists/*
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    MODELS_DIR=/app/models \
+    HF_HUB_OFFLINE=1 \
+    TORCH_HOME=/app/models/torch \
+    ENGINE_DEVICE=cuda
+# ONNX Runtime (Kokoro) uses the CUDA libraries that came with PyTorch
+ENV NV=/opt/venv/lib/python3.12/site-packages/nvidia
+ENV LD_LIBRARY_PATH=$NV/cublas/lib:$NV/cuda_runtime/lib:$NV/cudnn/lib:$NV/curand/lib:$NV/cufft/lib:$NV/cuda_nvrtc/lib
+RUN useradd --create-home --uid 10001 app
+WORKDIR /app
+COPY --from=deps /opt/venv /opt/venv
+COPY --from=models /models /app/models
+COPY server/ server/
+USER app
+CMD ["arq", "server.worker.main.WorkerSettings"]

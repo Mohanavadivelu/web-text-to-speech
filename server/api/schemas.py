@@ -6,8 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-from server.engine import voices
-from server.engine.synth import BLEND_RANGE, PITCH_RANGE, SPEED_RANGE
+from server import engines
+from server.engines.base import BLEND_RANGE, PITCH_RANGE, SPEED_RANGE
 
 
 class ErrorBody(BaseModel):
@@ -34,14 +34,19 @@ class VoiceOut(BaseModel):
     name: str
     gender: Literal["female", "male"]
     grade: str | None
+    tags: list[str] = Field(default_factory=list, description='e.g. "native"')
 
 
 class LanguageOut(BaseModel):
     code: str
     name: str
+    engine: Literal["kokoro", "indic_mio"]
     default_voice: str
     preview_text: str
     voices: list[VoiceOut]
+    emotions: list[str] = Field(
+        default_factory=list, description="Emotion tags this language understands, e.g. happy"
+    )
 
 
 class VoicesResponse(BaseModel):
@@ -73,7 +78,7 @@ class JobCreate(BaseModel):
     def _check_voice(self) -> JobCreate:
         if not self.text.strip():
             raise ValueError("There is no text to speak.")
-        voices.validate(self.lang, self.voice, self.blend_voice)  # ValueError → 422
+        engines.validate(self.lang, self.voice, self.blend_voice)  # ValueError → 422
         return self
 
 

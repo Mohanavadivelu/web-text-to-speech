@@ -452,6 +452,22 @@
             "title": "Default Voice",
             "type": "string"
           },
+          "emotions": {
+            "description": "Emotion tags this language understands, e.g. happy",
+            "items": {
+              "type": "string"
+            },
+            "title": "Emotions",
+            "type": "array"
+          },
+          "engine": {
+            "enum": [
+              "kokoro",
+              "indic_mio"
+            ],
+            "title": "Engine",
+            "type": "string"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -471,6 +487,7 @@
         "required": [
           "code",
           "name",
+          "engine",
           "default_voice",
           "preview_text",
           "voices"
@@ -639,6 +656,14 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "tags": {
+            "description": "e.g. \"native\"",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
           }
         },
         "required": [

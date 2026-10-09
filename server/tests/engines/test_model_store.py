@@ -3,12 +3,12 @@ import io
 
 import pytest
 
-from server.engine import model_store
-from server.engine.model_store import RemoteFile
+from server.engines.kokoro import model_store
+from server.engines.kokoro.model_store import RemoteFile
 
 
 def test_manifest_covers_model_tokenizer_and_all_voices():
-    from server.engine.voices import VOICES
+    from server.engines.kokoro.voices import VOICES
 
     paths = {f.repo_path for f in model_store.FILES}
     assert {"onnx/model.onnx", "tokenizer.json"} <= paths

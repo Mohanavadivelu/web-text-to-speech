@@ -1,0 +1,88 @@
+# GPU deployment: both engines on an NVIDIA GPU (tested on an RTX 3050 Ti, 4 GB).
+# Use it on top of the normal file:
+#
+#   docker compose -f server/docker-compose.yml -f server/docker-compose.gpu.yml up -d --build
+#
+# The CPU workers (worker-short, worker-long) are switched off; one Kokoro worker and
+# one Indic-Mio worker share the GPU (about 2.5 GB of video memory together).
+
+x-gpu-worker: &gpu-worker
+  build:
+    context: ..
+    dockerfile: server/Dockerfile.gpu
+  image: narravo-gpu:dev
+  command: ['arq', 'server.worker.main.WorkerSettings']
+  env_file:
+    - path: ../.env
+      required: false
+  volumes:
+    - ../server:/app/server:ro
+  extra_hosts:
+    - host.docker.internal:host-gateway
+  restart: unless-stopped
+  depends_on:
+    redis:
+      condition: service_healthy
+    seaweedfs:
+      condition: service_healthy
+  deploy:
+    resources:
+      reservations:
+        devices:
+          - driver: nvidia
+            count: all
+            capabilities: [gpu]
+
+x-gpu-env: &gpu-env
+  REDIS_URL: redis://redis:6379/0
+  R2_ENDPOINT_URL: http://seaweedfs:8333
+  R2_PUBLIC_ENDPOINT_URL: http://localhost:8333
+  R2_ACCESS_KEY_ID: dev-access-key
+  R2_SECRET_ACCESS_KEY: dev-secret-key
+  R2_BUCKET: kokoro-tts-audio
+  DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+  ENGINE_DEVICE: cuda
+  SPLIT_SHORT_LONG: 'false'
+
+services:
+  api:
+    environment:
+      SPLIT_SHORT_LONG: 'false' # Kokoro on a GPU is fast enough for one queue
+
+  worker-short:
+    profiles: ['cpu'] # off in the GPU deployment
+  worker-long:
+    profiles: ['cpu']
+
+  worker-kokoro:
+    <<: *gpu-worker
+    environment:
+      <<: *gpu-env
+      ENGINE: kokoro
+      WORKER_QUEUE: tts:kokoro
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  worker-indic:
+    <<: *gpu-worker
+    environment:
+      <<: *gpu-env
+      ENGINE: indic_mio
+      WORKER_QUEUE: tts:indic
+      # First start compiles the decoder (about a minute); later jobs are about 2x real time
+    deploy:
+      resources:
+        limits:
+          memory: 6g
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

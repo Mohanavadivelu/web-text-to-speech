@@ -1,4 +1,7 @@
-"""KokoroEngine: text → 24 kHz mono float32 speech with Kokoro-82M on ONNX Runtime (CPU).
+"""KokoroEngine: text → 24 kHz mono float32 speech with Kokoro-82M on ONNX Runtime.
+
+Runs on the CPU, or on an NVIDIA GPU with ENGINE_DEVICE=cuda (onnxruntime-gpu, CUDA
+libraries from the PyTorch install); it falls back to the CPU if CUDA isn't usable.
 
 One engine per worker process: the model is loaded once and kept in memory.
 generate() is thread-safe (calls are serialised) and supports streaming callbacks
@@ -6,7 +9,7 @@ and fast cancel.
 
 Command line, for quick experiments:
 
-    python -m server.engine.synth "Hello there." --voice af_heart --out hello.wav
+    python -m server.engines.kokoro.synth "Hello there." --voice af_heart --out hello.wav
 """
 
 from __future__ import annotations
@@ -22,27 +25,39 @@ from pathlib import Path
 
 import numpy as np
 
-from server.engine import audio, g2p, model_store, text, voices
+from server.engines.base import (
+    BLEND_RANGE,
+    PITCH_RANGE,
+    SPEED_RANGE,
+    GenerationCancelled,
+    check_range,
+)
+from server.engines.common import audio, text
+from server.engines.kokoro import g2p, model_store, voices
 
 log = logging.getLogger(__name__)
 
 SAMPLE_RATE = audio.SAMPLE_RATE
-SPEED_RANGE = (0.5, 2.0)
-PITCH_RANGE = (-6.0, 6.0)
-BLEND_RANGE = (0.0, 1.0)
 
-
-class GenerationCancelled(Exception):
-    """Raised by generate() when its cancel_event is set."""
+__all__ = [
+    "SAMPLE_RATE",
+    "BLEND_RANGE",
+    "PITCH_RANGE",
+    "SPEED_RANGE",
+    "GenerationCancelled",
+    "KokoroEngine",
+]
 
 
 class KokoroEngine:
+    name = "kokoro"
     default_realtime_factor = 3.0
 
     def __init__(self, threads: int | None = None):
         if threads is None:
             threads = int(os.environ.get("ENGINE_THREADS", "0") or 0)
         self.threads = threads  # ONNX Runtime intra-op threads; 0 = runtime default
+        self.device = os.environ.get("ENGINE_DEVICE", "cpu").lower()
         self.spin = os.environ.get("ENGINE_SPIN", "1") == "1"
         self.realtime_factor: float | None = None  # measured audio-seconds per second
         self._session = None
@@ -78,10 +93,16 @@ class KokoroEngine:
                 # several workers on one machine stop burning CPU fighting each other
                 opts.add_session_config_entry("session.intra_op.allow_spinning", "0")
             path = model_store.model_path()
-            log.info("Loading %s (%s threads)", path, self.threads or "auto")
-            self._session = ort.InferenceSession(
-                str(path), opts, providers=["CPUExecutionProvider"]
-            )
+            providers = ["CPUExecutionProvider"]
+            if self.device == "cuda":
+                if hasattr(ort, "preload_dlls"):
+                    ort.preload_dlls()  # CUDA and cuDNN from the PyTorch install (GPU image)
+                if "CUDAExecutionProvider" in ort.get_available_providers():
+                    providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+                else:
+                    log.warning("CUDA requested but not available to ONNX Runtime; using the CPU")
+            log.info("Loading %s on %s (%s threads)", path, providers[0], self.threads or "auto")
+            self._session = ort.InferenceSession(str(path), opts, providers=providers)
         return self._session
 
     def estimate_generation_seconds(self, audio_seconds: float) -> float:
@@ -110,9 +131,9 @@ class KokoroEngine:
         input, GenerationCancelled when cancel_event is set.
         """
         voices.validate(lang, voice, blend_voice)
-        _check_range("speed", speed, SPEED_RANGE)
-        _check_range("pitch", pitch, PITCH_RANGE)
-        _check_range("blend_ratio", blend_ratio, BLEND_RANGE)
+        check_range("speed", speed, SPEED_RANGE)
+        check_range("pitch", pitch, PITCH_RANGE)
+        check_range("blend_ratio", blend_ratio, BLEND_RANGE)
         if not source_text.strip():
             raise ValueError("There is no text to speak.")
 
@@ -208,12 +229,6 @@ def _watch_cancel(cancel_event: threading.Event, done: threading.Event, run_opti
                 return
 
     threading.Thread(target=watch, daemon=True).start()
-
-
-def _check_range(name: str, value: float, bounds: tuple[float, float]) -> None:
-    low, high = bounds
-    if not low <= value <= high:
-        raise ValueError(f"{name} must be between {low:g} and {high:g}.")
 
 
 def main(argv: list[str] | None = None) -> int:

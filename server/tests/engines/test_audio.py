@@ -3,7 +3,7 @@ import io
 import numpy as np
 import soundfile as sf
 
-from server.engine import audio
+from server.engines.common import audio
 
 SR = audio.SAMPLE_RATE
 

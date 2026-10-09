@@ -10,7 +10,7 @@ import logging
 import re
 import threading
 
-from server.engine.voices import LANGUAGES
+from server.engines.kokoro.voices import LANGUAGES
 
 log = logging.getLogger(__name__)
 

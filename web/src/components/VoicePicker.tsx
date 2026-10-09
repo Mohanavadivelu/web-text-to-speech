@@ -6,7 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Language, Voice } from '../api/client'
 import type { VoiceSettings } from '../lib/settings'
-import { genderSign } from '../lib/voices'
+import { ENGINE_LABELS, genderSign } from '../lib/voices'
 import styles from './VoicePicker.module.css'
 
 // Render it only while it should be open: it opens on mount and starts from the
@@ -19,7 +19,7 @@ interface Props {
 }
 
 type Gender = 'all' | 'female' | 'male'
-type Sort = 'grade' | 'name'
+type Sort = 'recommended' | 'grade' | 'name'
 
 const GRADE_ORDER = ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C', 'C-', 'D+', 'D', 'D-', 'F+', 'F']
 const gradeRank = (grade: string | null | undefined) =>
@@ -36,9 +36,9 @@ export function VoiceAvatar({ name, size = 36 }: { name: string; size?: number }
 export function VoicePicker({ onClose, languages, settings, onChoose }: Props) {
   const dialog = useRef<HTMLDialogElement>(null)
   const [query, setQuery] = useState('')
-  const [langFilter, setLangFilter] = useState<string>('all')
+
   const [gender, setGender] = useState<Gender>('all')
-  const [sort, setSort] = useState<Sort>('grade')
+  const [sort, setSort] = useState<Sort>('recommended')
   const [selected, setSelected] = useState({ lang: settings.lang, voice: settings.voice })
   const [blendVoice, setBlendVoice] = useState<string | null>(settings.blendVoice)
   const [blendRatio, setBlendRatio] = useState(settings.blendRatio)
@@ -50,27 +50,32 @@ export function VoicePicker({ onClose, languages, settings, onChoose }: Props) {
     return () => preview.current?.pause()
   }, [])
 
-  const groups = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    return languages
-      .filter((lang) => langFilter === 'all' || lang.code === langFilter)
-      .map((lang) => {
-        const voices = lang.voices
-          .filter((v) => gender === 'all' || v.gender === gender)
-          .filter(
-            (v) => !q || v.name.toLowerCase().includes(q) || lang.name.toLowerCase().includes(q),
-          )
-          .sort((a, b) =>
-            sort === 'name'
-              ? a.name.localeCompare(b.name)
-              : gradeRank(a.grade) - gradeRank(b.grade) || a.name.localeCompare(b.name),
-          )
-        return { lang, voices }
-      })
-      .filter((g) => g.voices.length)
-  }, [languages, query, langFilter, gender, sort])
+  const selectedLang = languages.find((l) => l.code === selected.lang) ?? languages[0]
 
-  const selectedLang = languages.find((l) => l.code === selected.lang)
+  // One language at a time: Indic voices speak all 23 Indian languages, so an
+  // "all languages" list would repeat them 23 times
+  const voices = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const list = (selectedLang?.voices ?? [])
+      .filter((v) => gender === 'all' || v.gender === gender)
+      .filter((v) => !q || v.name.toLowerCase().includes(q))
+    if (sort === 'name') return [...list].sort((a, b) => a.name.localeCompare(b.name))
+    if (sort === 'grade') {
+      return [...list].sort(
+        (a, b) => gradeRank(a.grade) - gradeRank(b.grade) || a.name.localeCompare(b.name),
+      )
+    }
+    return list // the engine's own order: its recommended voices first
+  }, [selectedLang, query, gender, sort])
+
+  const changeLanguage = (code: string) => {
+    const next = languages.find((l) => l.code === code)
+    if (!next) return
+    // Keep the voice if this language has it (Indic voices speak every Indian language)
+    const keep = next.voices.some((v) => v.id === selected.voice)
+    setSelected({ lang: next.code, voice: keep ? selected.voice : next.default_voice })
+    if (!next.voices.some((v) => v.id === blendVoice)) setBlendVoice(null)
+  }
   const selectedVoice = selectedLang?.voices.find((v) => v.id === selected.voice)
   const blend = selectedLang?.voices.find((v) => v.id === blendVoice)
   const blendPercent = Math.round(blendRatio * 100)
@@ -123,15 +128,20 @@ export function VoicePicker({ onClose, languages, settings, onChoose }: Props) {
             />
           </label>
           <select
-            value={langFilter}
-            onChange={(e) => setLangFilter(e.target.value)}
-            aria-label="Language filter"
+            value={selected.lang}
+            onChange={(e) => changeLanguage(e.target.value)}
+            aria-label="Language"
           >
-            <option value="all">All languages</option>
-            {languages.map((l) => (
-              <option key={l.code} value={l.code}>
-                {l.name}
-              </option>
+            {(['kokoro', 'indic_mio'] as const).map((engine) => (
+              <optgroup key={engine} label={ENGINE_LABELS[engine]}>
+                {languages
+                  .filter((l) => l.engine === engine)
+                  .map((l) => (
+                    <option key={l.code} value={l.code}>
+                      {l.name}
+                    </option>
+                  ))}
+              </optgroup>
             ))}
           </select>
           <div className={styles.chips} role="group" aria-label="Gender">
@@ -147,17 +157,21 @@ export function VoicePicker({ onClose, languages, settings, onChoose }: Props) {
             ))}
           </div>
           <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort">
+            <option value="recommended">Recommended</option>
             <option value="grade">Best grade</option>
             <option value="name">Name</option>
           </select>
         </div>
 
         <div className={styles.list} role="listbox" aria-label="Voices">
-          {groups.length === 0 && <p className={styles.empty}>No voices match.</p>}
-          {groups.map(({ lang, voices }) => (
-            <section key={lang.code}>
-              <h3 className={styles.group}>{lang.name}</h3>
+          {voices.length === 0 && <p className={styles.empty}>No voices match.</p>}
+          {selectedLang && voices.length > 0 && (
+            <section>
+              <h3 className={styles.group}>
+                {selectedLang.name} · {ENGINE_LABELS[selectedLang.engine]}
+              </h3>
               {voices.map((voice) => {
+                const lang = selectedLang
                 const isSelected = selected.voice === voice.id
                 return (
                   <div
@@ -179,6 +193,7 @@ export function VoicePicker({ onClose, languages, settings, onChoose }: Props) {
                       {voice.name} <span className={styles.gender}>{genderSign(voice.gender)}</span>
                     </span>
                     {voice.grade && <span className={styles.grade}>{voice.grade}</span>}
+                    {voice.tags?.includes('native') && <span className={styles.tag}>Native</span>}
                     <span className={styles.spacer} />
                     <button
                       className={styles.iconButton}
@@ -199,7 +214,7 @@ export function VoicePicker({ onClose, languages, settings, onChoose }: Props) {
                 )
               })}
             </section>
-          ))}
+          )}
         </div>
 
         <footer className={styles.footer}>

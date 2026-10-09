@@ -73,7 +73,10 @@ export function VoicePanel({ languages, settings, onChange, onOpenPicker, disabl
                   {voice.name} <span className={styles.muted}>{genderSign(voice.gender)}</span>
                   {voice.grade && <span className={styles.grade}>{voice.grade}</span>}
                 </span>
-                <span className={styles.langTag}>{lang.name}</span>
+                <span className={styles.langTag}>
+                  {lang.name}
+                  {lang.engine === 'indic_mio' ? ' · Indic' : ''}
+                </span>
               </span>
               <ArrowLeftRight size={16} className={styles.swap} aria-hidden />
             </button>

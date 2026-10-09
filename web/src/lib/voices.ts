@@ -2,6 +2,12 @@
 
 import type { HistoryItem } from '../api/client'
 
+/** How the two speech engines are presented. */
+export const ENGINE_LABELS: Record<string, string> = {
+  kokoro: 'Narravo Standard',
+  indic_mio: 'Narravo Indic',
+}
+
 export const LANGUAGE_NAMES: Record<string, string> = {
   a: 'US English',
   b: 'UK English',

@@ -201,6 +201,7 @@ Background `--chrome`, 1 px bottom `--border`.
 | Clean text | `sparkles` | Sends the text to `/v1/text/clean` and replaces it; one undo step reverts it |
 | Pronunciations | `book-a` | Opens the pronunciations dialog (signed in only) |
 | Undo / Redo | `undo-2` / `redo-2` | Editor history |
+| Emotion (Indic languages) | `smile` | Menu of the language's emotion tags; inserts ` <tag>` at the end of the sentence the cursor is in. Hint: `*word*` stresses a word. Hidden for languages without emotions |
 | Zoom | `zoom-in` / `zoom-out` | 80–160% in 10% steps, remembered |
 | Voice (medium widths) | `audio-lines` + voice name | Opens the settings drawer |
 
@@ -269,8 +270,8 @@ PITCH                  +0 st
 
 | Control | Details |
 |---|---|
-| Language | Select with the 7 languages. Changing it switches to that language's default voice and clears the mix voice |
-| Voice | Select listing voices with a quality grade badge (`--accent-soft` chip: A, B−, C+ …) and gender icon; ordered by grade |
+| Language | Select grouped by engine: "Narravo Standard" (7 Kokoro languages) and "Narravo Indic" (23 Indic-Mio languages). Changing it keeps the voice if the new language has it, otherwise switches to the default voice; the mix voice is cleared |
+| Voice | Select listing voices with a quality grade badge (`--accent-soft` chip: A, B−, C+ …) and gender icon; ordered by grade. Indic voices recorded in an Indian language carry a "Native" tag. The voice card shows the language with "· Indic" for Indic-Mio languages |
 | Preview | 32 px icon button; plays a stored sample of the voice. Pressing it again stops |
 | Mix with | Optional second voice of the same language. When set, a ratio slider appears (10–90%, step 10), labelled with both voice names |
 | Speed | Value in `--type-value`, `--accent-hover`; slider 0.5–2.0, step 0.05; double-click the value to reset to 1.0 |

@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from server.engine import model_store, voices
+from server.engines.kokoro import model_store, voices
 
 
 def test_seven_languages_and_37_voices():

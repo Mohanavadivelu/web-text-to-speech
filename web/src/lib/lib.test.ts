@@ -7,7 +7,7 @@ import { DEFAULT_SETTINGS, reconcile } from './settings'
 import { countWords, estimateSeconds, formatDuration, formatEstimate, formatShort } from './text'
 
 describe('text helpers', () => {
-  it('estimates like the server (server/engine/text.py)', () => {
+  it('estimates like the server (server/engines/common/text.py)', () => {
     const sample = 'x'.repeat(1400)
     expect(estimateSeconds(sample, 'a')).toBe(100)
     expect(estimateSeconds(sample, 'a', 2)).toBe(50)

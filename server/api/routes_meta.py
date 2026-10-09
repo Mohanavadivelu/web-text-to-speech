@@ -5,10 +5,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 
+from server import engines
 from server.api.deps import Services, services
 from server.api.schemas import ConfigOut, HealthOut, LanguageOut, VoiceOut, VoicesResponse
-from server.engine import voices
-from server.engine.text import DOCUMENT_TYPES
+from server.engines.common.text import DOCUMENT_TYPES
 from server.events import WORKER_HEARTBEAT_PREFIX
 
 router = APIRouter(prefix="/v1", tags=["meta"])
@@ -33,14 +33,16 @@ _VOICES = VoicesResponse(
         LanguageOut(
             code=lang.code,
             name=lang.name,
-            default_voice=voices.default_voice(lang.code).id,
+            engine=lang.engine,
+            default_voice=lang.default_voice.id,
             preview_text=lang.preview_text,
             voices=[
-                VoiceOut(id=v.id, name=v.name, gender=v.gender, grade=v.grade)
-                for v in voices.voices_for(lang.code)
+                VoiceOut(id=v.id, name=v.name, gender=v.gender, grade=v.grade, tags=list(v.tags))
+                for v in lang.voices
             ],
+            emotions=list(lang.emotions),
         )
-        for lang in voices.LANGUAGES.values()
+        for lang in engines.catalog()
     ]
 )
 

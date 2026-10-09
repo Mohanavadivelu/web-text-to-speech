@@ -21,7 +21,7 @@ from arq.connections import RedisSettings
 from server import events
 from server.config import get_settings
 from server.db import record_result_sync
-from server.engine.synth import KokoroEngine
+from server.engines import create_engine
 from server.worker.jobs import JobRequest, run_job
 from server.worker.storage import Storage
 
@@ -35,11 +35,14 @@ WORKER_ID = f"{socket.gethostname()}-{os.getpid()}"
 async def synthesize(ctx: dict, job_id: str, request: dict) -> dict:
     """arq job: run a speech job in a thread so the event loop stays responsive."""
     job_request = JobRequest(**request)
+    engine = ctx["engine"]
+    if job_request.engine != engine.name:  # a routing mistake: never speak with the wrong model
+        raise ValueError(f"Job for engine {job_request.engine} reached a {engine.name} worker")
     return await asyncio.to_thread(
         run_job,
         job_id,
         job_request,
-        engine=ctx["engine"],
+        engine=engine,
         storage=ctx["storage"],
         redis=ctx["redis_sync"],
         settings=ctx["settings"],
@@ -79,11 +82,12 @@ async def startup(ctx: dict) -> None:
     )
     if settings.r2_endpoint_url:  # development store: create the bucket if needed
         await _ensure_bucket(ctx["storage"])
-    engine = KokoroEngine(threads=settings.engine_threads)
+    kwargs = {"threads": settings.engine_threads} if settings.engine == "kokoro" else {}
+    engine = create_engine(settings.engine, **kwargs)
     await asyncio.to_thread(engine.load)
     ctx["engine"] = engine
     ctx["heartbeat"] = asyncio.create_task(_heartbeat(ctx["redis"]))
-    log.info("Worker %s ready on queue %s", WORKER_ID, settings.worker_queue)
+    log.info("Worker %s ready: %s on queue %s", WORKER_ID, settings.engine, settings.worker_queue)
 
 
 async def shutdown(ctx: dict) -> None:

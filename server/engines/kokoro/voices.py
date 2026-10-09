@@ -11,6 +11,8 @@ from functools import lru_cache
 
 import numpy as np
 
+from server.engines import base
+
 STYLE_ROWS = 510  # one style row per phoneme count (1–510)
 STYLE_DIM = 256
 
@@ -97,6 +99,23 @@ VOICES: dict[str, Voice] = {
 }
 
 
+def catalog() -> list[base.Language]:
+    """Kokoro's languages and voices in the shared catalogue format."""
+    return [
+        base.Language(
+            code=lang.code,
+            name=lang.name,
+            engine="kokoro",
+            preview_text=lang.preview_text,
+            voices=tuple(
+                base.Voice(id=v.id, name=v.name, gender=v.gender, grade=v.grade)
+                for v in voices_for(lang.code)
+            ),
+        )
+        for lang in LANGUAGES.values()
+    ]
+
+
 def voices_for(lang: str) -> list[Voice]:
     return [v for v in VOICES.values() if v.lang == lang]
 
@@ -120,7 +139,7 @@ def validate(lang: str, voice_id: str, blend_voice: str | None = None) -> None:
 @lru_cache(maxsize=64)
 def load_style(voice_id: str) -> np.ndarray:
     """Style table of a voice, shape (510, 256) float32, read-only."""
-    from server.engine import model_store
+    from server.engines.kokoro import model_store
 
     table = np.fromfile(model_store.voice_path(voice_id), dtype=np.float32)
     table = table.reshape(STYLE_ROWS, STYLE_DIM)

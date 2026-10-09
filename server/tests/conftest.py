@@ -9,7 +9,7 @@ import os
 
 import pytest
 
-from server.engine import model_store
+from server.engines.kokoro import model_store
 
 
 def _models_present() -> bool:
@@ -22,7 +22,7 @@ def pytest_collection_modifyitems(config, items):
     if os.environ.get("REQUIRE_MODELS") == "1":
         raise pytest.UsageError(
             "REQUIRE_MODELS=1 but the model files are missing: "
-            "run `python -m server.engine.model_store download`."
+            "run `python -m server.engines.kokoro.model_store download`."
         )
     skip = pytest.mark.skip(reason="model files not downloaded")
     for item in items:
@@ -32,7 +32,7 @@ def pytest_collection_modifyitems(config, items):
 
 @pytest.fixture(scope="session")
 def engine():
-    from server.engine.synth import KokoroEngine
+    from server.engines.kokoro.synth import KokoroEngine
 
     eng = KokoroEngine()
     eng.load()

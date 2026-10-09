@@ -11,7 +11,7 @@ import asyncio
 import multiprocessing as mp
 import sys
 
-from server.engine.text import ExtractError
+from server.engines.common.text import ExtractError
 
 MEMORY_LIMIT_BYTES = 768 * 1024 * 1024
 MAX_PARALLEL = 2  # extractions at once per API process; more wait their turn
@@ -25,7 +25,7 @@ def _child(conn, data: bytes, filename: str) -> None:
 
         resource.setrlimit(resource.RLIMIT_AS, (MEMORY_LIMIT_BYTES, MEMORY_LIMIT_BYTES))
     try:
-        from server.engine.text import extract_text
+        from server.engines.common.text import extract_text
 
         conn.send(("ok", extract_text(data, filename)))
     except ExtractError as exc:

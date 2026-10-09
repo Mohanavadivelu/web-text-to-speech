@@ -18,8 +18,9 @@ FROM deps AS models
 
 WORKDIR /build
 COPY server/__init__.py server/__init__.py
-COPY server/engine/__init__.py server/engine/model_store.py server/engine/
-RUN python -m server.engine.model_store download --dir /models
+COPY server/engines/__init__.py server/engines/
+COPY server/engines/kokoro/__init__.py server/engines/kokoro/model_store.py server/engines/kokoro/
+RUN python -m server.engines.kokoro.model_store download --dir /models
 
 # ── 3. Runtime image ─────────────────────────────────────────────────────────
 FROM python:3.12-slim

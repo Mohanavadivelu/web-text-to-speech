@@ -8,9 +8,9 @@ import numpy as np
 import pytest
 import soundfile as sf
 
-from server.engine import voices
-from server.engine.synth import SAMPLE_RATE, GenerationCancelled
-from server.tests.engine import reference
+from server.engines.kokoro import voices
+from server.engines.kokoro.synth import SAMPLE_RATE, GenerationCancelled
+from server.tests.engines import reference
 
 pytestmark = pytest.mark.slow
 

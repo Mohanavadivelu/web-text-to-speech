@@ -14,9 +14,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from server.engine import audio, voices  # noqa: E402
-from server.engine.synth import KokoroEngine  # noqa: E402
-from server.tests.engine.reference import REFERENCE_DIR, REFERENCE_TEXTS, clip_path  # noqa: E402
+from server.engines.common import audio  # noqa: E402
+from server.engines.kokoro import voices  # noqa: E402
+from server.engines.kokoro.synth import KokoroEngine  # noqa: E402
+from server.tests.engines.reference import REFERENCE_DIR, REFERENCE_TEXTS, clip_path  # noqa: E402
 
 
 def main() -> int:

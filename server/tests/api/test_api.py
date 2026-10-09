@@ -23,10 +23,15 @@ def test_health_needs_a_live_worker(client, env):
 
 def test_voices(client):
     body = client.get("/v1/voices").json()
-    assert len(body["languages"]) == 7
-    assert sum(len(lang["voices"]) for lang in body["languages"]) == 37
+    kokoro = [lang for lang in body["languages"] if lang["engine"] == "kokoro"]
+    indic = [lang for lang in body["languages"] if lang["engine"] == "indic_mio"]
+    assert len(kokoro) == 7 and len(indic) == 23
+    assert sum(len(lang["voices"]) for lang in kokoro) == 37
     english = body["languages"][0]
     assert english["code"] == "a" and english["default_voice"] == "af_heart"
+    tamil = next(lang for lang in indic if lang["code"] == "ta")
+    assert tamil["default_voice"] == "in_ananya" and "happy" in tamil["emotions"]
+    assert {"in_ananya", "in_heart"} <= {v["id"] for v in tamil["voices"]}
     assert body["speed"] == [0.5, 2.0]
 
 

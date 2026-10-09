@@ -34,7 +34,7 @@ This is the build plan for the Stage 1 MVP described in [WEB_STAGE1_PLAN.md](WEB
   - the code is merged and has tests, or a manual check written in the PR
   - CI is green
   - anything a later task depends on (env vars, endpoints, message formats) is written down in the PR or the docs
-- **The engine (`server/engine/`) never imports web code.** It must stay usable on its own from tests and scripts.
+- **The engines (`server/engines/`) never import web code.** It must stay usable on its own from tests and scripts.
 
 ---
 
@@ -48,6 +48,7 @@ This is the build plan for the Stage 1 MVP described in [WEB_STAGE1_PLAN.md](WEB
 | **M3** API | Full Stage 1 API with streaming | 4 | Generate and stream speech using only `curl` and a WebSocket client |
 | **M4** Frontend | Studio screen in the browser | 5 | Type text, hear it within ~3 s, download it |
 | **M5** Accounts + limits | Sign-in, history, pronunciations, abuse protection | 2.5 | Anonymous and signed-in limits work |
+| **M5.5** Indic engine | Indic-Mio as a second engine on GPU | 3 | Hindi, Tamil and 20 more languages stream in the Studio |
 | **M6** Production | Live on the internet with monitoring | 2.5 | Public URL, alerts, automatic deploys |
 | **M7** Beta + launch | Real users, fixes, launch | 5+ | Public launch |
 
@@ -172,6 +173,26 @@ Builds `server/engine/` as described in §5 of the Stage 1 plan.
 
 ---
 
+## M5.5: Indic engine (Indic-Mio on GPU)
+
+| ID | Task | Done when |
+|---|---|---|
+| M5.5.1 | Split `server/engine` into `server/engines/{kokoro,indic_mio,common}` with a shared `base.py` and an engine registry | Each model's code lives only in its own package; tests pass |
+| M5.5.2 | Indic-Mio model store: LM, codec and WavLM pinned and SHA-256 checked, built into the image | `model_store verify` passes with the network off |
+| M5.5.3 | Indic-Mio engine: sentence streaming, speed (codec target length), pitch, voice mixing (speaker embeddings), cancel, compiled decoding with a fixed-size static cache | ~2× real time on an RTX 3050 Ti, steady across sentence lengths |
+| M5.5.4 | 10 voice embeddings and previews | Previews play in the voice picker |
+| M5.5.5 | Routing: the language picks the engine and queue; cache key includes the engine's model version | Kokoro and Indic jobs run side by side |
+| M5.5.6 | GPU image and compose override with one worker per engine | Both workers on one 4 GB GPU |
+| M5.5.7 | Studio: language picker grouped by engine, Native tag, emotion button | Browser test (`E2E_INDIC=1`) passes |
+
+Notes from building it:
+- The static cache is sized by prompt + new tokens, and transformers rebuilds it (and recompiles) whenever a call needs a bigger one; the model's own `max_new_tokens=2048` also wins over `max_length`. Keeping prompt + new tokens at a fixed 1280, with a stopping rule at 700 speech tokens, keeps every sentence at ~2.1× real time (it was 0.1–0.2× with recompiles).
+- onnxruntime-gpu must match PyTorch's CUDA 12.6 libraries: 1.23.2 works; 1.29+ needs CUDA ≥ 12.8 or 13.
+- Before charging for Indic voices, confirm commercial use with SPRING Lab: part of the training data (Expresso) is CC-BY-NC-4.0.
+- Eight preview sentences (Maithili, Konkani, Dogri, Bodo, Sindhi, Kashmiri, Manipuri, Santali) need checking by native speakers.
+
+---
+
 ## M6: Production
 
 | ID | Task | Est. | Done when |
@@ -232,8 +253,8 @@ cd web && npm install && npm run dev                  # frontend :5173, proxies 
 **Engine on its own** (no Docker needed for quick experiments):
 
 ```bash
-python -m server.engine.model_store download          # once
-python -m server.engine.synth "Hello there." --voice af_heart --out hello.wav
+python -m server.engines.kokoro.model_store download  # once
+python -m server.engines.kokoro.synth "Hello there." --voice af_heart --out hello.wav
 ```
 
 **Tests:**

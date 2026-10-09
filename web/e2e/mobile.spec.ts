@@ -17,7 +17,7 @@ test('phone: voice, settings and history above Generate; no sideways scrolling',
   // The voice picker opens full screen
   await voiceChip.click()
   const picker = page.getByRole('dialog', { name: 'Choose a voice' })
-  await picker.getByLabel('Language filter').selectOption({ label: 'Hindi' })
+  await picker.getByLabel('Language').selectOption('h') // Hindi (Narravo Standard)
   await picker
     .getByRole('listbox', { name: 'Voices' })
     .getByRole('option', { name: /Alpha/ })

@@ -1,9 +1,10 @@
 // Text editor panel (DESIGN.md §7): a calm writing area in a reading font, with the
 // tools, counts and the Generate button along the bottom.
 
-import { FileUp, Play, Sparkles, Square, ZoomIn, ZoomOut } from 'lucide-react'
+import { FileUp, Play, Smile, Sparkles, Square, ZoomIn, ZoomOut } from 'lucide-react'
 import {
   forwardRef,
+  useEffect,
   useImperativeHandle,
   useRef,
   useState,
@@ -39,6 +40,8 @@ interface Props {
   documentTypes: string[]
   /** Phones and tablets: voice, settings and history buttons, just above Generate. */
   controls?: ReactNode
+  /** Emotion tags the current language understands (Indic voices); none = no button. */
+  emotions?: string[]
 }
 
 export const TextEditor = forwardRef<TextEditorHandle, Props>(function TextEditor(props, ref) {
@@ -59,11 +62,47 @@ export const TextEditor = forwardRef<TextEditorHandle, Props>(function TextEdito
     onClean,
     documentTypes,
     controls,
+    emotions = [],
   } = props
   const area = useRef<HTMLTextAreaElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const [hasSelection, setHasSelection] = useState(false)
   const [dragging, setDragging] = useState(false)
+  const [emotionMenu, setEmotionMenu] = useState(false)
+  const emotionRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!emotionMenu) return
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      const outside =
+        e instanceof KeyboardEvent
+          ? e.key === 'Escape'
+          : !emotionRef.current?.contains(e.target as Node)
+      if (outside) setEmotionMenu(false)
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', close)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', close)
+    }
+  }, [emotionMenu])
+
+  /** Put <tag> at the end of the sentence the cursor is in (where the model expects it). */
+  const insertEmotion = (tag: string) => {
+    setEmotionMenu(false)
+    const el = area.current
+    const cursor = el ? el.selectionEnd : text.length
+    const after = text.slice(cursor)
+    const end = after.search(/[.!?।॥](?=\s|$)/)
+    const at = end === -1 ? text.length : cursor + end + 1
+    const insert = ` <${tag}>`
+    onTextChange(text.slice(0, at) + insert + text.slice(at))
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(at + insert.length, at + insert.length)
+    })
+  }
 
   useImperativeHandle(ref, () => ({
     selection() {
@@ -139,6 +178,27 @@ export const TextEditor = forwardRef<TextEditorHandle, Props>(function TextEdito
           <ToolButton label="Clean text (Ctrl+Shift+L)" onClick={onClean} disabled={busy || empty}>
             <Sparkles size={18} />
           </ToolButton>
+          {emotions.length > 0 && (
+            <div className={styles.emotion} ref={emotionRef}>
+              <ToolButton
+                label="Add an emotion to this sentence"
+                onClick={() => setEmotionMenu((open) => !open)}
+                disabled={busy || empty}
+              >
+                <Smile size={18} />
+              </ToolButton>
+              {emotionMenu && (
+                <div className={styles.emotionMenu} role="menu" aria-label="Emotions">
+                  {emotions.map((tag) => (
+                    <button key={tag} role="menuitem" onClick={() => insertEmotion(tag)}>
+                      {tag}
+                    </button>
+                  ))}
+                  <span className={styles.emotionHint}>Use *word* to stress a word.</span>
+                </div>
+              )}
+            </div>
+          )}
           <span className={styles.divider} />
           <ToolButton
             label="Smaller text"
