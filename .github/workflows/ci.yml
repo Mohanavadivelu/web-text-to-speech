@@ -58,7 +58,7 @@ jobs:
             requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - name: Cache model files
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: models
           # The model files are pinned in model_store.py, so its hash identifies them
