@@ -2,5 +2,5 @@
 -r server/requirements.txt
 pytest==9.1.1
 httpx2==2.13.1               # test client for FastAPI/Starlette
-ruff==0.16.10
+ruff==0.17.0
 fakeredis==2.39.0            # in-memory Redis for worker tests
