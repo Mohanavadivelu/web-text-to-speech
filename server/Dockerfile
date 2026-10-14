@@ -5,7 +5,7 @@
 #   Worker:  arq server.worker.main.WorkerSettings
 
 # ── 1. Python dependencies in a virtual environment ──────────────────────────
-FROM python:3.12-slim AS deps
+FROM python:3.14-slim AS deps
 
 ENV PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN python -m venv /opt/venv
@@ -23,7 +23,7 @@ COPY server/engines/kokoro/__init__.py server/engines/kokoro/model_store.py serv
 RUN python -m server.engines.kokoro.model_store download --dir /models
 
 # ── 3. Runtime image ─────────────────────────────────────────────────────────
-FROM python:3.12-slim
+FROM python:3.14-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
