@@ -1,17 +1,17 @@
 # Runtime dependencies for the API, workers and speech engine.
 
 # ── API ──────────────────────────────────────────────────────────────────────
-fastapi==0.142.3
+fastapi==0.144.0
 uvicorn[standard]==0.54.0
-pydantic==2.13.5
-pydantic-settings==2.15.0
+pydantic==2.14.1
+pydantic-settings==2.16.0
 python-multipart==0.0.32      # file uploads
-sentry-sdk==2.71.0
+sentry-sdk==2.72.0
 
 # ── Jobs and storage ─────────────────────────────────────────────────────────
 arq==0.28.0
-redis==5.3.1
-boto3==1.43.109
+redis==8.1.0
+boto3==1.43.114
 
 # ── Accounts (Supabase Postgres and sign-in tokens) ──────────────────────────
 psycopg[binary]==3.3.6
@@ -20,8 +20,8 @@ PyJWT[crypto]==2.15.1
 cryptography==50.0.2
 
 # ── Speech engine (server/engine) ────────────────────────────────────────────
-numpy==2.4.6
-onnxruntime==1.30.0
+numpy==2.5.4
+onnxruntime==1.31.0
 soundfile==0.14.0
 misaki==0.9.4                 # G2P; installed without extras so PyTorch isn't pulled in
 spacy==3.8.16
@@ -31,4 +31,4 @@ espeakng-loader==0.2.4        # bundles espeak-ng (non-English phonemes); no sys
 phonemizer-fork==3.3.2
 loguru==0.7.3
 python-docx==1.2.0
-pypdf==6.19.0
+pypdf==6.21.1
